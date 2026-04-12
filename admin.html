@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Config — Shiftwave Ambassador Tool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="nav-mount"></div>
+
+  <main class="page-wrapper page-wrapper--mid">
+
+    <div class="page-header">
+      <div class="page-header__eyebrow">Configuration</div>
+      <h1 class="page-header__title">Admin Config</h1>
+      <p class="page-header__subtitle">Manage scoring weights, thresholds, and hard stop rules</p>
+    </div>
+
+    <div class="warning-banner">
+      <span>⚠</span>
+      Changes take effect immediately for new evaluations. Past evaluations are locked to the config version used at the time of scoring.
+    </div>
+
+    <!-- Current Config Info -->
+    <div class="card mb-4">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;">
+        <div>
+          <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-sec);margin-bottom:4px;">Active Configuration</div>
+          <div id="config-name" style="font-size:1.125rem;font-weight:700;color:var(--text);"></div>
+          <div id="config-meta" style="font-size:0.8125rem;color:var(--text-sec);margin-top:4px;"></div>
+        </div>
+        <div style="display:flex;gap:0.75rem;">
+          <button class="btn btn--danger btn--sm" onclick="resetToDefaults()">Reset to Defaults</button>
+          <button class="btn btn--primary btn--sm" onclick="saveAll()">Save All Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="weights" onclick="switchTab('weights')">Category Weights</button>
+      <button class="tab-btn" data-tab="thresholds" onclick="switchTab('thresholds')">Thresholds</button>
+      <button class="tab-btn" data-tab="hardstops" onclick="switchTab('hardstops')">Hard Stop Rules</button>
+      <button class="tab-btn" data-tab="history" onclick="switchTab('history')">Config History</button>
+    </div>
+
+    <!-- ── WEIGHTS TAB ── -->
+    <div class="tab-pane active" id="tab-weights">
+      <div id="weights-container">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- ── THRESHOLDS TAB ── -->
+    <div class="tab-pane" id="tab-thresholds">
+      <div class="card">
+        <div style="font-size:0.875rem;color:var(--text-sec);margin-bottom:1.5rem;line-height:1.6;">
+          Define the score bands and their recommendation labels. Scores are calculated on a 0–100 scale. Ranges must be contiguous and cover 0–100.
+        </div>
+
+        <div style="display:grid;grid-template-columns:80px 80px 1fr 120px 44px;gap:0.75rem;align-items:center;padding:0 0 0.5rem;border-bottom:1px solid var(--border);margin-bottom:0.75rem;">
+          <span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-sec);">Min</span>
+          <span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-sec);">Max</span>
+          <span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-sec);">Label</span>
+          <span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-sec);">Color</span>
+          <span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-sec);">Preview</span>
+        </div>
+
+        <div id="thresholds-container">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ── HARD STOPS TAB ── -->
+    <div class="tab-pane" id="tab-hardstops">
+      <div style="font-size:0.875rem;color:var(--text-sec);margin-bottom:1.5rem;line-height:1.6;">
+        Hard stop rules can override the numeric score with a fixed decision. Toggle rules on or off — disabled rules will not be applied during scoring.
+      </div>
+      <div id="hardstops-container">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- ── HISTORY TAB ── -->
+    <div class="tab-pane" id="tab-history">
+      <div style="font-size:0.875rem;color:var(--text-sec);margin-bottom:1.5rem;">
+        Each time you save changes, a version snapshot is recorded here.
+      </div>
+      <div id="config-history-container">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.getElementById('nav-mount').innerHTML = UI.renderNav('admin');
+
+    let config = Storage.getConfig();
+    const configHistory = JSON.parse(localStorage.getItem('sw_config_history') || '[]');
+
+    // ── Tab Switching
+    function switchTab(id) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      document.querySelector(`.tab-btn[data-tab="${id}"]`).classList.add('active');
+      document.getElementById(`tab-${id}`).classList.add('active');
+    }
+
+    // ── Render Config Info
+    function renderConfigInfo() {
+      document.getElementById('config-name').textContent = config.name || 'Default Config';
+      document.getElementById('config-meta').textContent =
+        `Version ${config.version || '1.0.0'} · Last updated ${UI.formatDate(config.updatedAt)}`;
+    }
+
+    // ── Render Weights
+    function renderWeights() {
+      const container = document.getElementById('weights-container');
+      container.innerHTML = Object.entries(config.ambassadorTypes).map(([typeKey, typeInfo]) => {
+        const weights = config.weights[typeKey] || {};
+        const total = Object.values(weights).reduce((s, v) => s + Number(v), 0);
+        const isOk = total === 100;
+
+        const rows = Object.entries(config.categories).map(([catKey, cat]) => `
+          <div class="weight-row">
+            <div class="weight-row__label">${cat.label}</div>
+            <input
+              class="weight-input"
+              type="number"
+              min="0" max="100"
+              value="${weights[catKey] ?? 0}"
+              data-type="${typeKey}"
+              data-cat="${catKey}"
+              oninput="updateWeight('${typeKey}', '${catKey}', this.value)">
+          </div>
+        `).join('');
+
+        return `
+          <div class="weight-type-section" id="wts-${typeKey}">
+            <div class="weight-type-header">
+              <div>
+                <div class="weight-type-header__title">${typeInfo.label}</div>
+                <div style="font-size:0.8125rem;color:var(--text-sec);margin-top:2px;">${typeInfo.description}</div>
+              </div>
+              <div class="weight-total ${isOk ? 'weight-total--ok' : 'weight-total--bad'}" id="total-${typeKey}">
+                Total: ${total} / 100
+              </div>
+            </div>
+            ${rows}
+            <div style="padding:10px 1.25rem;background:var(--elevated);border-top:1px solid var(--border);display:flex;justify-content:flex-end;">
+              <button class="btn btn--secondary btn--sm" onclick="saveWeightsForType('${typeKey}')">Save ${typeInfo.label}</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateWeight(typeKey, catKey, value) {
+      if (!config.weights[typeKey]) config.weights[typeKey] = {};
+      config.weights[typeKey][catKey] = Number(value) || 0;
+
+      const total = Object.values(config.weights[typeKey]).reduce((s, v) => s + Number(v), 0);
+      const totalEl = document.getElementById(`total-${typeKey}`);
+      if (totalEl) {
+        totalEl.textContent = `Total: ${total} / 100`;
+        totalEl.className = `weight-total ${total === 100 ? 'weight-total--ok' : 'weight-total--bad'}`;
+      }
+    }
+
+    function saveWeightsForType(typeKey) {
+      const total = Object.values(config.weights[typeKey]).reduce((s, v) => s + Number(v), 0);
+      if (total !== 100) {
+        UI.toast(`Weights for this type must sum to 100 (currently ${total}).`, 'error');
+        return;
+      }
+      Storage.setConfig(config);
+      config = Storage.getConfig();
+      UI.toast('Weights saved.');
+    }
+
+    // ── Render Thresholds
+    function renderThresholds() {
+      const container = document.getElementById('thresholds-container');
+      container.innerHTML = config.thresholds.map((t, i) => `
+        <div style="display:grid;grid-template-columns:80px 80px 1fr 120px 44px;gap:0.75rem;align-items:center;padding:0.5rem 0;border-bottom:1px solid var(--border);" id="thresh-row-${i}">
+          <input class="weight-input" type="number" min="0" max="100" value="${t.min}"
+            oninput="updateThreshold(${i}, 'min', this.value)" style="width:70px;">
+          <input class="weight-input" type="number" min="0" max="100" value="${t.max}"
+            oninput="updateThreshold(${i}, 'max', this.value)" style="width:70px;">
+          <input class="threshold-label-input" type="text" value="${t.label}"
+            oninput="updateThreshold(${i}, 'label', this.value)">
+          <input class="threshold-label-input" type="color" value="${t.color}"
+            oninput="updateThreshold(${i}, 'color', this.value)"
+            style="padding:2px 4px;height:36px;cursor:pointer;">
+          <div class="threshold-color-preview" id="thresh-preview-${i}" style="background:${t.color};"></div>
+        </div>
+      `).join('') + `
+        <div style="padding-top:1rem;display:flex;justify-content:flex-end;">
+          <button class="btn btn--secondary btn--sm" onclick="saveThresholds()">Save Thresholds</button>
+        </div>
+      `;
+    }
+
+    function updateThreshold(idx, field, value) {
+      if (field === 'min' || field === 'max') {
+        config.thresholds[idx][field] = Number(value);
+      } else {
+        config.thresholds[idx][field] = value;
+      }
+      if (field === 'color') {
+        const preview = document.getElementById(`thresh-preview-${idx}`);
+        if (preview) preview.style.background = value;
+      }
+    }
+
+    function saveThresholds() {
+      Storage.setConfig(config);
+      config = Storage.getConfig();
+      renderConfigInfo();
+      UI.toast('Thresholds saved.');
+    }
+
+    // ── Render Hard Stops
+    function renderHardStops() {
+      const container = document.getElementById('hardstops-container');
+      container.innerHTML = config.hardStopRules.map((rule, i) => `
+        <div class="hard-stop-row">
+          <div class="hard-stop-row__body">
+            <div class="hard-stop-row__label">${rule.label}</div>
+            <div class="hard-stop-row__condition">${rule.condition}</div>
+            <div class="hard-stop-row__effect">Effect: ${rule.effectLabel}</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" ${rule.enabled ? 'checked' : ''} onchange="toggleHardStop(${i}, this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      `).join('') + `
+        <div style="margin-top:1rem;display:flex;justify-content:flex-end;">
+          <button class="btn btn--secondary btn--sm" onclick="saveHardStops()">Save Hard Stop Rules</button>
+        </div>
+      `;
+    }
+
+    function toggleHardStop(idx, enabled) {
+      config.hardStopRules[idx].enabled = enabled;
+    }
+
+    function saveHardStops() {
+      Storage.setConfig(config);
+      config = Storage.getConfig();
+      renderConfigInfo();
+      UI.toast('Hard stop rules saved.');
+    }
+
+    // ── Render Config History
+    function renderConfigHistory() {
+      const container = document.getElementById('config-history-container');
+      if (configHistory.length === 0) {
+        container.innerHTML = `
+          <div style="padding:2rem;text-align:center;color:var(--text-sec);font-size:0.9375rem;">
+            No version history yet. Save a change to start tracking versions.
+          </div>
+        `;
+        return;
+      }
+      container.innerHTML = `
+        <div class="version-list">
+          ${configHistory.slice().reverse().map(v => `
+            <div class="version-item">
+              <div>
+                <div class="version-item__label">${v.name || 'Config'} — v${v.version}</div>
+                <div style="font-size:0.8125rem;color:var(--text-sec);margin-top:2px;">${v.note || 'Manual save'}</div>
+              </div>
+              <div class="version-item__date">${UI.formatDate(v.savedAt)}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // ── Save All
+    function saveAll() {
+      // Validate all weights
+      let allValid = true;
+      for (const typeKey of Object.keys(config.ambassadorTypes)) {
+        const total = Object.values(config.weights[typeKey] || {}).reduce((s, v) => s + Number(v), 0);
+        if (total !== 100) {
+          UI.toast(`${config.ambassadorTypes[typeKey].label} weights don't sum to 100 (got ${total}).`, 'error');
+          allValid = false;
+        }
+      }
+      if (!allValid) return;
+
+      // Bump version
+      const parts = (config.version || '1.0.0').split('.');
+      parts[2] = String(Number(parts[2] || 0) + 1);
+      config.version = parts.join('.');
+      config.updatedAt = new Date().toISOString();
+
+      // Save history snapshot
+      configHistory.push({
+        name: config.name,
+        version: config.version,
+        savedAt: config.updatedAt,
+        note: 'Saved from Admin'
+      });
+      localStorage.setItem('sw_config_history', JSON.stringify(configHistory));
+
+      Storage.setConfig(config);
+      config = Storage.getConfig();
+      renderConfigInfo();
+      renderConfigHistory();
+      UI.toast(`Config saved — version ${config.version}`);
+    }
+
+    // ── Reset to Defaults
+    function resetToDefaults() {
+      if (!UI.confirm('Reset all scoring config to defaults? This cannot be undone. Past evaluations will not be affected.')) return;
+      Storage.resetConfig();
+      config = Storage.getConfig();
+      renderAll();
+      UI.toast('Config reset to defaults.');
+    }
+
+    function renderAll() {
+      renderConfigInfo();
+      renderWeights();
+      renderThresholds();
+      renderHardStops();
+      renderConfigHistory();
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>

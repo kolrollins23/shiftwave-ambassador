@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ambassador Evaluation Tool — Shiftwave</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="nav-mount"></div>
+
+  <main class="page-wrapper">
+
+    <div class="page-header">
+      <div class="page-header__eyebrow">Internal Tool</div>
+      <h1 class="page-header__title">Ambassador Evaluation Tool</h1>
+      <p class="page-header__subtitle">Score and track brand ambassador candidates for Shiftwave</p>
+    </div>
+
+    <!-- Tip callout -->
+    <div class="callout callout--gold mb-4">
+      <span class="callout__icon">◆</span>
+      <div>
+        <strong>Best ambassador type: Practitioner / Daily User</strong> — Doctors, trainers, and bodyworkers who use the device with clients every single day consistently drive the most sales. Real-life exposure is the secret weapon.
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card">
+        <div class="stat-card__label">Total Evaluated</div>
+        <div class="stat-card__value" id="stat-total">0</div>
+        <div class="stat-card__sub">All time</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__label">Strong Yes</div>
+        <div class="stat-card__value stat-card__value--accent" id="stat-strong-yes">0</div>
+        <div class="stat-card__sub">Ready to activate</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__label">Average Score</div>
+        <div class="stat-card__value" id="stat-avg">—</div>
+        <div class="stat-card__sub">Out of 100</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__label">This Month</div>
+        <div class="stat-card__value" id="stat-month">0</div>
+        <div class="stat-card__sub" id="stat-month-label">Evaluations</div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="flex gap-2 mb-4">
+      <a href="evaluate.html" class="btn btn--primary btn--lg">
+        <span>+</span> New Evaluation
+      </a>
+      <a href="history.html" class="btn btn--secondary">View History</a>
+      <a href="admin.html" class="btn btn--ghost">Admin Config</a>
+    </div>
+
+    <!-- Recent Evaluations -->
+    <div class="card">
+      <div class="card__header">
+        <span class="card__title">Recent Evaluations</span>
+        <a href="history.html" class="btn btn--ghost btn--sm">View All</a>
+      </div>
+
+      <div id="recent-table-container">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    // ── Mount Nav
+    document.getElementById('nav-mount').innerHTML = UI.renderNav('index');
+
+    // ── Load Stats
+    const stats = AppStats.compute();
+    document.getElementById('stat-total').textContent = stats.total;
+    document.getElementById('stat-strong-yes').textContent = stats.strongYes;
+    document.getElementById('stat-avg').textContent = stats.total > 0 ? stats.avgScore : '—';
+    document.getElementById('stat-month').textContent = stats.thisMonth;
+
+    const now = new Date();
+    document.getElementById('stat-month-label').textContent =
+      now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    // ── Recent Evaluations Table
+    function renderRecentTable() {
+      const container = document.getElementById('recent-table-container');
+      const evals = Storage.getEvaluations().slice(0, 10);
+      const config = Storage.getConfig();
+
+      if (evals.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state__icon">◎</div>
+            <div class="empty-state__title">No evaluations yet</div>
+            <div class="empty-state__body">Start by evaluating your first ambassador candidate. The tool will guide you through a structured scoring process.</div>
+            <a href="evaluate.html" class="btn btn--primary">Start First Evaluation</a>
+          </div>
+        `;
+        return;
+      }
+
+      const rows = evals.map(ev => {
+        const typeLabel = UI.getAmbassadorTypeLabel(ev.candidate?.type, config);
+        const score = ev.result?.totalScore ?? 0;
+        const rec = ev.result?.recommendation ?? 'N/A';
+        return `
+          <tr>
+            <td class="td-name">${ev.candidate?.name || '—'}</td>
+            <td><span class="type-badge">${typeLabel}</span></td>
+            <td>${UI.scoreBadge(score, rec)}</td>
+            <td>${UI.recPill(rec)}</td>
+            <td class="td-muted">${UI.formatDate(ev.createdAt)}</td>
+            <td>
+              <div class="action-row">
+                <a href="results.html?id=${ev.id}" class="btn btn--ghost btn--sm">View</a>
+                <button class="btn btn--danger btn--sm" onclick="deleteEval('${ev.id}')">Delete</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Score</th>
+                <th>Recommendation</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function deleteEval(id) {
+      if (UI.confirm('Delete this evaluation? This cannot be undone.')) {
+        Storage.deleteEvaluation(id);
+        location.reload();
+      }
+    }
+
+    renderRecentTable();
+  </script>
+</body>
+</html>

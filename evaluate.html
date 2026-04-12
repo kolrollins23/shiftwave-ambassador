@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Evaluation — Shiftwave Ambassador Tool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="nav-mount"></div>
+
+  <main class="page-wrapper page-wrapper--narrow">
+
+    <div class="page-header">
+      <div class="page-header__eyebrow">New Evaluation</div>
+      <h1 class="page-header__title">Score a Candidate</h1>
+      <p class="page-header__subtitle">Complete all four steps to generate a scoring recommendation</p>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-bar-wrapper mb-4">
+      <div class="progress-steps" id="progress-steps">
+        <div class="progress-step active" data-step="1">
+          <div class="progress-step__dot">1</div>
+          <div class="progress-step__label">Candidate Info</div>
+        </div>
+        <div class="progress-step" data-step="2">
+          <div class="progress-step__dot">2</div>
+          <div class="progress-step__label">Score Factors</div>
+        </div>
+        <div class="progress-step" data-step="3">
+          <div class="progress-step__dot">3</div>
+          <div class="progress-step__label">Red Flags</div>
+        </div>
+        <div class="progress-step" data-step="4">
+          <div class="progress-step__dot">4</div>
+          <div class="progress-step__label">Review & Submit</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 1: Candidate Info ── -->
+    <div id="step-1" class="step-pane">
+      <div class="card mb-4">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:1.5rem;">Candidate Information</h2>
+
+        <div class="form-group">
+          <label class="form-label" for="evaluator">Your Name (Evaluator)<span class="required">*</span></label>
+          <input class="form-input" type="text" id="evaluator" placeholder="e.g. Kol Rollins">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="candidate-name">Candidate Name<span class="required">*</span></label>
+          <input class="form-input" type="text" id="candidate-name" placeholder="Full name">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ambassador Type<span class="required">*</span></label>
+          <div class="type-cards" id="type-cards">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <div class="form-cols">
+          <div class="form-group">
+            <label class="form-label" for="profession">Profession / Role</label>
+            <input class="form-input" type="text" id="profession" placeholder="e.g. Physical Therapist, Surgeon">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="location">Location / Market</label>
+            <input class="form-input" type="text" id="location" placeholder="e.g. NYC, Miami, LA, Austin">
+          </div>
+        </div>
+
+        <div class="form-cols">
+          <div class="form-group">
+            <label class="form-label" for="instagram">Instagram Handle</label>
+            <input class="form-input" type="text" id="instagram" placeholder="@handle">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="linkedin">LinkedIn URL</label>
+            <input class="form-input" type="text" id="linkedin" placeholder="linkedin.com/in/...">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="initial-notes">Initial Notes</label>
+          <textarea class="form-textarea" id="initial-notes" rows="3" placeholder="How did they come up? First impressions? Context about why they're being evaluated..."></textarea>
+        </div>
+      </div>
+
+      <div class="step-nav">
+        <div></div>
+        <button class="btn btn--primary" onclick="goToStep(2)">Continue to Scoring →</button>
+      </div>
+    </div>
+
+    <!-- ── STEP 2: Score Factors ── -->
+    <div id="step-2" class="step-pane hidden">
+      <div id="scoring-categories">
+        <!-- Rendered by JS -->
+      </div>
+
+      <div class="step-nav">
+        <button class="btn btn--ghost" onclick="goToStep(1)">← Back</button>
+        <button class="btn btn--primary" onclick="goToStep(3)">Continue to Red Flags →</button>
+      </div>
+    </div>
+
+    <!-- ── STEP 3: Red Flags ── -->
+    <div id="step-3" class="step-pane hidden">
+      <div class="card mb-3">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:0.5rem;">Red Flags & Context</h2>
+        <p style="font-size:0.875rem;color:var(--text-sec);margin-bottom:1.5rem;">Check any that apply. Some will trigger hard stops that override the score.</p>
+
+        <div class="checkbox-item checkbox-item--danger" id="check-competitor">
+          <input type="checkbox" id="flag-competitor">
+          <label for="flag-competitor" class="checkbox-item__body" style="cursor:pointer">
+            <div class="checkbox-item__label">Actively promotes competitors</div>
+            <div class="checkbox-item__help">They are currently promoting a direct Shiftwave competitor. Triggers executive review flag.</div>
+          </label>
+        </div>
+
+        <div class="checkbox-item checkbox-item--danger" id="check-brand-risk">
+          <input type="checkbox" id="flag-brand-risk">
+          <label for="flag-brand-risk" class="checkbox-item__body" style="cursor:pointer">
+            <div class="checkbox-item__label">Reputation or brand safety concern</div>
+            <div class="checkbox-item__help">Known controversies, legal issues, or behaviors inconsistent with Shiftwave's brand. Triggers automatic No — Brand Risk.</div>
+          </label>
+        </div>
+
+        <div class="checkbox-item" id="check-oversaturated">
+          <input type="checkbox" id="flag-oversaturated">
+          <label for="flag-oversaturated" class="checkbox-item__body" style="cursor:pointer">
+            <div class="checkbox-item__label">Appears oversaturated / promotes everything</div>
+            <div class="checkbox-item__help">The "Greg" type — midlife male, promotes every product that hits their DMs. Exclusivity is important for our brand.</div>
+          </label>
+        </div>
+
+        <div class="checkbox-item" id="check-pricing">
+          <input type="checkbox" id="flag-pricing">
+          <label for="flag-pricing" class="checkbox-item__body" style="cursor:pointer">
+            <div class="checkbox-item__label">Financial expectations are unrealistic</div>
+            <div class="checkbox-item__help">Asking for $50k+ retainers or compensation structures that don't align with our model (7% commission, sell-10-get-1, mission-driven).</div>
+          </label>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <h3 style="font-size:1rem;font-weight:700;margin-bottom:1rem;">Suggested Compensation Structure</h3>
+        <div class="form-group">
+          <label class="form-label" for="comp-structure">What structure fits this person?</label>
+          <select class="form-select" id="comp-structure">
+            <option value="unknown">Unknown / TBD</option>
+            <option value="mission_driven">Mission-Driven (no ask)</option>
+            <option value="commission_7pct">7% Commission</option>
+            <option value="sell_10_get_1">Sell-10-Get-1-Free</option>
+            <option value="custom_retainer">Custom Retainer</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="evaluator-notes">Additional Notes</label>
+          <textarea class="form-textarea" id="evaluator-notes" rows="4"
+            placeholder="Anything else relevant — conversation details, specific strengths or concerns, next steps already discussed..."></textarea>
+        </div>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn btn--ghost" onclick="goToStep(2)">← Back</button>
+        <button class="btn btn--primary" onclick="goToStep(4)">Review & Submit →</button>
+      </div>
+    </div>
+
+    <!-- ── STEP 4: Review & Submit ── -->
+    <div id="step-4" class="step-pane hidden">
+      <div class="card mb-3">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:1.25rem;">Review Candidate</h2>
+        <div class="review-summary-grid" id="review-candidate-summary">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:1.25rem;">Score Preview</h2>
+        <div class="review-scores-list" id="review-scores-list">
+          <!-- Populated by JS -->
+        </div>
+
+        <div style="margin-top:1.5rem;padding:1.25rem;background:var(--elevated);border:1px solid var(--border);border-radius:var(--radius);text-align:center;">
+          <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-sec);margin-bottom:0.5rem;">Estimated Score</div>
+          <div id="review-estimated-score" style="font-size:3rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:0.5rem;">—</div>
+          <div id="review-rec-pill"></div>
+        </div>
+      </div>
+
+      <div class="card mb-3" id="review-flags-card" style="display:none;">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:1rem;color:var(--red);">Red Flags</h2>
+        <div id="review-flags-list"></div>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn btn--ghost" onclick="goToStep(3)">← Back</button>
+        <button class="btn btn--primary btn--lg" id="submit-btn" onclick="submitEvaluation()">
+          Score This Candidate
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.getElementById('nav-mount').innerHTML = UI.renderNav('evaluate');
+
+    const config = Storage.getConfig();
+    let currentStep = 1;
+    let selectedType = null;
+    const scores = {};
+
+    // ── Render Ambassador Type Cards
+    function renderTypeCards() {
+      const container = document.getElementById('type-cards');
+      container.innerHTML = Object.entries(config.ambassadorTypes).map(([key, type]) => `
+        <div class="type-card${type.featured ? ' type-card--featured' : ''}" data-type="${key}" onclick="selectType('${key}')">
+          <input type="radio" class="type-radio" name="ambassador-type" value="${key}" id="type-${key}">
+          <div class="type-card__icon">${type.icon}</div>
+          <div class="type-card__label">${type.label}</div>
+          <div class="type-card__desc">${type.description}</div>
+        </div>
+      `).join('');
+    }
+
+    function selectType(key) {
+      selectedType = key;
+      document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+      const card = document.querySelector(`.type-card[data-type="${key}"]`);
+      if (card) card.classList.add('selected');
+      // Re-render scoring if already on step 2
+      if (currentStep === 2) renderScoringCategories();
+    }
+
+    // ── Render Scoring Categories
+    function renderScoringCategories() {
+      const container = document.getElementById('scoring-categories');
+      if (!selectedType) {
+        container.innerHTML = `<div class="callout callout--info"><span class="callout__icon">ℹ</span>Please go back and select an ambassador type first.</div>`;
+        return;
+      }
+
+      const weights = config.weights[selectedType];
+      container.innerHTML = Object.entries(config.categories).map(([catKey, cat]) => {
+        const weight = weights[catKey] || 0;
+        const isFeatured = catKey === 'reallife_access' && selectedType === 'practitioner';
+
+        const subFactorHtml = Object.entries(cat.subFactors).map(([sfKey, sf]) => {
+          const currentVal = scores[sfKey] !== undefined ? scores[sfKey] : 5;
+          return `
+            <div class="slider-group">
+              <div class="slider-header">
+                <span class="slider-label">${sf.label}</span>
+                <div class="slider-value-display">
+                  <span class="slider-number" id="num-${sfKey}">${currentVal}</span>
+                  <span class="slider-label-text" id="lbl-${sfKey}">${UI.scoreLabel(currentVal)}</span>
+                </div>
+              </div>
+              <div class="slider-help">${sf.help}</div>
+              <input type="range" min="1" max="10" value="${currentVal}"
+                id="slider-${sfKey}"
+                oninput="updateSlider('${sfKey}', '${catKey}', this.value)">
+            </div>
+          `;
+        }).join('');
+
+        // Calculate current category average
+        const sfKeys = Object.keys(cat.subFactors);
+        const avg = sfKeys.reduce((s, k) => s + (scores[k] !== undefined ? scores[k] : 5), 0) / sfKeys.length;
+
+        return `
+          <div class="category-section${isFeatured ? ' category-section--featured' : ''}" id="cat-section-${catKey}">
+            <div class="category-header">
+              <div class="category-header__left">
+                <div class="category-header__label">
+                  ${cat.label}
+                  ${isFeatured ? '<span class="category-featured-tag">Top Priority</span>' : ''}
+                  <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;margin-left:4px;">Weight: ${weight}%</span>
+                </div>
+                <div class="category-header__desc">${cat.description}</div>
+                <div class="category-header__note">${cat.founderNote}</div>
+              </div>
+              <div class="category-score-preview">
+                <div class="category-score-preview__label">Avg</div>
+                <div class="category-score-preview__value" id="cat-avg-${catKey}">${avg.toFixed(1)}</div>
+                <div class="category-score-preview__sub">/ 10</div>
+              </div>
+            </div>
+            <div class="category-body">
+              ${subFactorHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateSlider(sfKey, catKey, value) {
+      scores[sfKey] = Number(value);
+      document.getElementById(`num-${sfKey}`).textContent = value;
+      document.getElementById(`lbl-${sfKey}`).textContent = UI.scoreLabel(value);
+
+      // Update category average
+      const cat = config.categories[catKey];
+      const sfKeys = Object.keys(cat.subFactors);
+      const avg = sfKeys.reduce((s, k) => s + (scores[k] !== undefined ? scores[k] : 5), 0) / sfKeys.length;
+      const avgEl = document.getElementById(`cat-avg-${catKey}`);
+      if (avgEl) avgEl.textContent = avg.toFixed(1);
+    }
+
+    // ── Step Navigation
+    function goToStep(step) {
+      // Validate step 1
+      if (step > 1) {
+        const evaluator = document.getElementById('evaluator').value.trim();
+        const candName = document.getElementById('candidate-name').value.trim();
+        if (!candName) {
+          alert('Please enter the candidate name.');
+          return;
+        }
+        if (!selectedType) {
+          alert('Please select an ambassador type.');
+          return;
+        }
+      }
+
+      currentStep = step;
+
+      // Hide all steps
+      document.querySelectorAll('.step-pane').forEach(p => p.classList.add('hidden'));
+      document.getElementById(`step-${step}`).classList.remove('hidden');
+
+      // Update progress
+      document.querySelectorAll('.progress-step').forEach(el => {
+        const s = parseInt(el.dataset.step);
+        el.classList.remove('active', 'completed');
+        if (s < step) el.classList.add('completed');
+        if (s === step) el.classList.add('active');
+      });
+
+      if (step === 2) {
+        renderScoringCategories();
+      }
+
+      if (step === 4) {
+        renderReview();
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ── Render Review Step
+    function renderReview() {
+      const candName = document.getElementById('candidate-name').value.trim();
+      const evaluator = document.getElementById('evaluator').value.trim();
+      const profession = document.getElementById('profession').value.trim();
+      const location = document.getElementById('location').value.trim();
+      const instagram = document.getElementById('instagram').value.trim();
+      const typeLabel = config.ambassadorTypes[selectedType]?.label || selectedType;
+
+      // Candidate summary
+      document.getElementById('review-candidate-summary').innerHTML = `
+        <div class="review-summary-item">
+          <div class="review-summary-item__label">Name</div>
+          <div class="review-summary-item__value">${candName || '—'}</div>
+        </div>
+        <div class="review-summary-item">
+          <div class="review-summary-item__label">Type</div>
+          <div class="review-summary-item__value"><span class="type-badge">${typeLabel}</span></div>
+        </div>
+        <div class="review-summary-item">
+          <div class="review-summary-item__label">Profession</div>
+          <div class="review-summary-item__value">${profession || '—'}</div>
+        </div>
+        <div class="review-summary-item">
+          <div class="review-summary-item__label">Location</div>
+          <div class="review-summary-item__value">${location || '—'}</div>
+        </div>
+        <div class="review-summary-item">
+          <div class="review-summary-item__label">Instagram</div>
+          <div class="review-summary-item__value">${instagram || '—'}</div>
+        </div>
+        <div class="review-summary-item">
+          <div class="review-summary-item__label">Evaluator</div>
+          <div class="review-summary-item__value">${evaluator || '—'}</div>
+        </div>
+      `;
+
+      // Scores list
+      const weights = config.weights[selectedType];
+      document.getElementById('review-scores-list').innerHTML = Object.entries(config.categories).map(([catKey, cat]) => {
+        const sfKeys = Object.keys(cat.subFactors);
+        const avg = sfKeys.reduce((s, k) => s + (scores[k] !== undefined ? scores[k] : 5), 0) / sfKeys.length;
+        const weight = weights[catKey] || 0;
+        return `
+          <div class="review-score-row">
+            <span class="review-score-label">${cat.label} <span style="color:var(--text-muted);font-weight:400;font-size:0.8em;">(${weight}%)</span></span>
+            <span class="review-score-value">${avg.toFixed(1)} / 10</span>
+          </div>
+        `;
+      }).join('');
+
+      // Live score calculation
+      const redFlags = {
+        competitor_promotion: document.getElementById('flag-competitor').checked,
+        brand_risk: document.getElementById('flag-brand-risk').checked,
+        oversaturated: document.getElementById('flag-oversaturated').checked,
+        pricing_mismatch: document.getElementById('flag-pricing').checked
+      };
+
+      const result = ScoringEngine.calculate(scores, selectedType, config, redFlags);
+
+      document.getElementById('review-estimated-score').textContent = Math.round(result.totalScore);
+      document.getElementById('review-rec-pill').innerHTML = UI.recPill(result.recommendation);
+
+      // Flags
+      const flagNames = {
+        competitor_promotion: 'Actively promotes competitors',
+        brand_risk: 'Brand/reputation concern',
+        oversaturated: 'Oversaturated / promotes everything',
+        pricing_mismatch: 'Financial expectations mismatch'
+      };
+      const activeFlags = Object.entries(redFlags).filter(([,v]) => v);
+      if (activeFlags.length > 0) {
+        document.getElementById('review-flags-card').style.display = '';
+        document.getElementById('review-flags-list').innerHTML = activeFlags.map(([k]) => `
+          <div style="padding:8px 12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius);margin-bottom:0.5rem;font-size:0.875rem;color:var(--red);">
+            ⚑ ${flagNames[k]}
+          </div>
+        `).join('');
+      } else {
+        document.getElementById('review-flags-card').style.display = 'none';
+      }
+    }
+
+    // ── Submit Evaluation
+    function submitEvaluation() {
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+
+      const redFlags = {
+        competitor_promotion: document.getElementById('flag-competitor').checked,
+        brand_risk: document.getElementById('flag-brand-risk').checked,
+        oversaturated: document.getElementById('flag-oversaturated').checked,
+        pricing_mismatch: document.getElementById('flag-pricing').checked
+      };
+
+      const result = ScoringEngine.calculate(scores, selectedType, config, redFlags);
+
+      const candidate = {
+        name: document.getElementById('candidate-name').value.trim(),
+        type: selectedType,
+        profession: document.getElementById('profession').value.trim(),
+        location: document.getElementById('location').value.trim(),
+        instagram: document.getElementById('instagram').value.trim(),
+        linkedin: document.getElementById('linkedin').value.trim(),
+        notes: document.getElementById('initial-notes').value.trim()
+      };
+
+      const evaluation = {
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+        evaluator: document.getElementById('evaluator').value.trim(),
+        candidate,
+        scores: Object.assign({}, scores),
+        redFlags,
+        compensationStructure: document.getElementById('comp-structure').value,
+        evaluatorNotes: document.getElementById('evaluator-notes').value.trim(),
+        result,
+        override: null
+      };
+
+      // Fill in defaults for any unscored sub-factors
+      for (const [catKey, cat] of Object.entries(config.categories)) {
+        for (const sfKey of Object.keys(cat.subFactors)) {
+          if (evaluation.scores[sfKey] === undefined) {
+            evaluation.scores[sfKey] = 5;
+          }
+        }
+      }
+
+      Storage.saveEvaluation(evaluation);
+      window.location.href = `results.html?id=${evaluation.id}`;
+    }
+
+    // ── Init
+    renderTypeCards();
+  </script>
+</body>
+</html>

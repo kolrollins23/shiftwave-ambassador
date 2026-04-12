@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evaluation Results — Shiftwave Ambassador Tool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="nav-mount"></div>
+
+  <main class="page-wrapper page-wrapper--mid" id="main-content">
+    <div class="empty-state" id="loading-state">
+      <div class="empty-state__icon">◎</div>
+      <div class="empty-state__title">Loading evaluation…</div>
+    </div>
+  </main>
+
+  <!-- Override Modal -->
+  <div class="modal-overlay" id="override-modal">
+    <div class="modal">
+      <div class="modal__header">
+        <div class="modal__title">Override Recommendation</div>
+        <div class="modal__subtitle">This will be logged with your name and timestamp.</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">New Decision</label>
+        <select class="form-select" id="override-decision">
+          <option value="Strong Yes">Strong Yes</option>
+          <option value="Yes — Pilot Test">Yes — Pilot Test</option>
+          <option value="Strategic Maybe">Strategic Maybe</option>
+          <option value="No for Now">No for Now</option>
+          <option value="No">No</option>
+          <option value="No — Brand Risk">No — Brand Risk</option>
+          <option value="Flag — Executive Review">Flag — Executive Review</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reason for Override</label>
+        <textarea class="form-textarea" id="override-reason" rows="3"
+          placeholder="Explain why you're overriding the algorithmic recommendation..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Your Name</label>
+        <input class="form-input" type="text" id="override-by" placeholder="Name">
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn--ghost" onclick="closeOverrideModal()">Cancel</button>
+        <button class="btn btn--primary" onclick="saveOverride()">Save Override</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.getElementById('nav-mount').innerHTML = UI.renderNav('history');
+
+    const params = new URLSearchParams(window.location.search);
+    const evalId = params.get('id');
+    const config = Storage.getConfig();
+
+    let evaluation = null;
+
+    function render() {
+      evaluation = Storage.getEvaluation(evalId);
+      const main = document.getElementById('main-content');
+
+      if (!evaluation) {
+        main.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state__icon">✕</div>
+            <div class="empty-state__title">Evaluation not found</div>
+            <div class="empty-state__body">This evaluation may have been deleted or the link is invalid.</div>
+            <a href="history.html" class="btn btn--primary">Back to History</a>
+          </div>
+        `;
+        return;
+      }
+
+      const { candidate, result, evaluator, createdAt, redFlags, evaluatorNotes, compensationStructure, override } = evaluation;
+      const typeInfo = config.ambassadorTypes[candidate.type] || {};
+      const explanation = ScoringEngine.generateExplanation(result, candidate, config);
+
+      // Gauge SVG
+      const r = 70;
+      const circ = 2 * Math.PI * r;
+      const offset = circ * (1 - (result.totalScore / 100));
+      const displayRec = override ? override.decision : result.recommendation;
+      const displayColor = UI.getRecommendationColor(displayRec);
+
+      // Category breakdown rows
+      const catRows = Object.entries(config.categories).map(([catKey, cat]) => {
+        const cs = result.categoryScores[catKey];
+        if (!cs) return '';
+        const pct = cs.weight > 0 ? (cs.raw / 10) * 100 : 0;
+        return `
+          <div class="cat-bar-row">
+            <div class="cat-bar-label">${cat.label}</div>
+            <div class="cat-bar-wrapper">
+              <div class="cat-bar-fill" style="width:${pct}%;background:${displayColor};" data-width="${pct}"></div>
+            </div>
+            <div class="cat-bar-score">${cs.raw.toFixed(1)} / 10</div>
+            <div class="cat-bar-pts">${cs.contribution.toFixed(1)}pts</div>
+          </div>
+        `;
+      }).join('');
+
+      // Hard stop banner
+      const hardStopHtml = result.hardStopTriggered ? `
+        <div class="hard-stop-banner">
+          <span class="hard-stop-banner__icon">⚑</span>
+          <div>
+            <div class="hard-stop-banner__title">
+              ${result.hardStopType === 'brand_risk' ? 'Hard Stop — Brand Risk' : 'Flag — Executive Review Required'}
+            </div>
+            <div class="hard-stop-banner__body">
+              ${result.hardStopType === 'brand_risk'
+                ? 'A brand safety or reputation concern has been flagged. This overrides the numeric score. Do not proceed without a formal review.'
+                : 'This candidate actively promotes competitors. Escalate to the executive team before any outreach or commitment.'}
+            </div>
+          </div>
+        </div>
+      ` : '';
+
+      // Red flags summary
+      const flagLabels = {
+        competitor_promotion: 'Actively promotes competitors',
+        brand_risk: 'Brand/reputation concern flagged',
+        oversaturated: 'Oversaturated — promotes everything',
+        pricing_mismatch: 'Financial expectations mismatch'
+      };
+      const activeFlags = redFlags ? Object.entries(redFlags).filter(([,v]) => v) : [];
+
+      // Override section
+      const overrideHtml = override ? `
+        <div class="override-active mb-3">
+          <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--accent);margin-bottom:6px;">Override Active</div>
+          <div style="font-size:1rem;font-weight:700;color:var(--text);margin-bottom:4px;">${override.decision}</div>
+          <div style="font-size:0.875rem;color:var(--text-sec);">${override.reason}</div>
+          <div class="override-meta">Overridden by ${override.by} · ${UI.formatDate(override.at)}</div>
+        </div>
+      ` : '';
+
+      const compLabels = {
+        mission_driven: 'Mission-Driven (no ask)',
+        commission_7pct: '7% Commission',
+        sell_10_get_1: 'Sell-10-Get-1-Free',
+        custom_retainer: 'Custom Retainer',
+        unknown: 'Unknown / TBD'
+      };
+
+      main.innerHTML = `
+        <div style="margin-bottom:1.5rem;">
+          <a href="history.html" style="font-size:0.875rem;color:var(--text-sec);text-decoration:none;display:inline-flex;align-items:center;gap:6px;" class="back-link">← All Evaluations</a>
+        </div>
+
+        ${hardStopHtml}
+
+        <!-- Header -->
+        <div class="results-header">
+          <div>
+            <div class="results-name">${candidate.name}</div>
+            <div class="results-meta">
+              <span class="type-badge">${typeInfo.label || candidate.type}</span>
+              ${candidate.profession ? `<span class="meta-sep">·</span><span class="meta-item">${candidate.profession}</span>` : ''}
+              ${candidate.location ? `<span class="meta-sep">·</span><span class="meta-item">${candidate.location}</span>` : ''}
+              <span class="meta-sep">·</span><span class="meta-item">Evaluated by ${evaluator || 'Unknown'}</span>
+              <span class="meta-sep">·</span><span class="meta-item">${UI.formatDate(createdAt)}</span>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn--ghost btn--sm" onclick="window.print()">Export PDF</button>
+            <button class="btn btn--secondary btn--sm" onclick="openOverrideModal()">Override Recommendation</button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:300px 1fr;gap:2rem;align-items:start;margin-bottom:2rem;" class="results-main-grid">
+
+          <!-- Gauge -->
+          <div class="card" style="text-align:center;">
+            <div class="gauge-container">
+              <svg class="gauge-svg" width="180" height="180" viewBox="0 0 180 180">
+                <circle class="gauge-bg" cx="90" cy="90" r="${r}" stroke-width="10"/>
+                <circle class="gauge-fill" id="gauge-fill" cx="90" cy="90" r="${r}"
+                  stroke-width="10"
+                  stroke="${displayColor}"
+                  stroke-dasharray="${circ}"
+                  stroke-dashoffset="${circ}"/>
+                <text class="gauge-score-text" x="90" y="85" font-size="38">${Math.round(result.totalScore)}</text>
+                <text class="gauge-label-text" x="90" y="115" font-size="13">out of 100</text>
+              </svg>
+            </div>
+            <div style="margin-top:0.5rem;">
+              ${UI.recPill(displayRec)}
+            </div>
+            ${override ? `<div style="font-size:0.75rem;color:var(--text-sec);margin-top:0.5rem;">(Override applied)</div>` : ''}
+
+            ${candidate.instagram || candidate.linkedin || evaluatorNotes || compensationStructure ? `
+              <div style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid var(--border);text-align:left;">
+                ${candidate.instagram ? `<div style="font-size:0.8125rem;color:var(--text-sec);margin-bottom:6px;"><span style="color:var(--text-muted)">Instagram:</span> ${candidate.instagram}</div>` : ''}
+                ${candidate.linkedin ? `<div style="font-size:0.8125rem;color:var(--text-sec);margin-bottom:6px;"><span style="color:var(--text-muted)">LinkedIn:</span> ${candidate.linkedin}</div>` : ''}
+                ${compensationStructure ? `<div style="font-size:0.8125rem;color:var(--text-sec);margin-bottom:6px;"><span style="color:var(--text-muted)">Comp structure:</span> ${compLabels[compensationStructure] || compensationStructure}</div>` : ''}
+                ${activeFlags.length > 0 ? `
+                  <div style="margin-top:0.75rem;">
+                    ${activeFlags.map(([k]) => `<div style="font-size:0.75rem;color:var(--red);margin-bottom:4px;">⚑ ${flagLabels[k]}</div>`).join('')}
+                  </div>
+                ` : ''}
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- Category Breakdown -->
+          <div>
+            <div class="card mb-3">
+              <div class="card__header">
+                <span class="card__title">Category Breakdown</span>
+              </div>
+              <div class="category-bars" id="cat-bars">
+                ${catRows}
+              </div>
+            </div>
+
+            ${evaluatorNotes ? `
+              <div class="card mb-3">
+                <div class="card__title" style="margin-bottom:0.75rem;">Evaluator Notes</div>
+                <div style="font-size:0.9375rem;color:var(--text-sec);line-height:1.7;white-space:pre-wrap;">${evaluatorNotes}</div>
+              </div>
+            ` : ''}
+
+            ${candidate.notes ? `
+              <div class="card mb-3">
+                <div class="card__title" style="margin-bottom:0.75rem;">Initial Notes</div>
+                <div style="font-size:0.9375rem;color:var(--text-sec);line-height:1.7;white-space:pre-wrap;">${candidate.notes}</div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+
+        <!-- Explanation -->
+        <div class="card mb-3">
+          <div class="card__header">
+            <span class="card__title">Analysis</span>
+          </div>
+          <div class="explanation-block" style="background:transparent;border:none;padding:0;">
+
+            ${explanation.strengths.length > 0 ? `
+              <div class="explanation-section">
+                <div class="explanation-section__title">Strengths</div>
+                ${explanation.strengths.map(s => `
+                  <div class="explanation-strength">
+                    <span style="color:var(--green);flex-shrink:0;">✓</span>
+                    <span>${s}</span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+
+            ${explanation.concerns.length > 0 ? `
+              <div class="explanation-section">
+                <div class="explanation-section__title">Concerns</div>
+                ${explanation.concerns.map(c => `
+                  <div class="explanation-concern">
+                    <span style="color:var(--red);flex-shrink:0;">!</span>
+                    <span>${c}</span>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+
+            ${explanation.improvement ? `
+              <div class="explanation-section">
+                <div class="explanation-section__title">What Would Need to Improve</div>
+                <div style="font-size:0.875rem;color:var(--text-sec);line-height:1.6;padding:10px 14px;background:var(--elevated);border:1px solid var(--border);border-radius:var(--radius);">
+                  ${explanation.improvement}
+                </div>
+              </div>
+            ` : ''}
+
+            <div class="explanation-section">
+              <div class="explanation-section__title">Suggested Next Step</div>
+              <div class="explanation-next">${explanation.nextStep}</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Override Section -->
+        <div class="override-box">
+          <div class="card__title" style="margin-bottom:1rem;">Recommendation Override</div>
+          ${overrideHtml}
+          <button class="btn btn--secondary btn--sm" onclick="openOverrideModal()">
+            ${override ? 'Update Override' : 'Override Recommendation'}
+          </button>
+          ${override ? `<button class="btn btn--ghost btn--sm" style="margin-left:0.5rem;" onclick="clearOverride()">Remove Override</button>` : ''}
+        </div>
+      `;
+
+      // Animate gauge fill after render
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          const fill = document.getElementById('gauge-fill');
+          if (fill) fill.setAttribute('stroke-dashoffset', offset);
+        }, 100);
+      });
+    }
+
+    // ── Override Modal
+    function openOverrideModal() {
+      if (evaluation?.override) {
+        document.getElementById('override-decision').value = evaluation.override.decision;
+        document.getElementById('override-reason').value = evaluation.override.reason;
+        document.getElementById('override-by').value = evaluation.override.by;
+      }
+      document.getElementById('override-modal').classList.add('open');
+    }
+
+    function closeOverrideModal() {
+      document.getElementById('override-modal').classList.remove('open');
+    }
+
+    function saveOverride() {
+      const decision = document.getElementById('override-decision').value;
+      const reason = document.getElementById('override-reason').value.trim();
+      const by = document.getElementById('override-by').value.trim();
+
+      if (!reason) { alert('Please provide a reason for the override.'); return; }
+      if (!by) { alert('Please enter your name.'); return; }
+
+      evaluation.override = { decision, reason, by, at: new Date().toISOString() };
+      Storage.saveEvaluation(evaluation);
+      closeOverrideModal();
+      render();
+      UI.toast('Override saved.');
+    }
+
+    function clearOverride() {
+      if (!UI.confirm('Remove the override? The algorithmic recommendation will be restored.')) return;
+      evaluation.override = null;
+      Storage.saveEvaluation(evaluation);
+      render();
+      UI.toast('Override removed.');
+    }
+
+    // Close modal on overlay click
+    document.getElementById('override-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeOverrideModal();
+    });
+
+    render();
+  </script>
+
+  <style>
+    .results-main-grid {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 2rem;
+      align-items: start;
+    }
+    @media (max-width: 768px) {
+      .results-main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .back-link:hover { color: var(--text) !important; }
+  </style>
+
+</body>
+</html>

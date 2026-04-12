@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Evaluation History — Shiftwave Ambassador Tool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="nav-mount"></div>
+
+  <main class="page-wrapper">
+
+    <div class="page-header">
+      <div class="page-header__eyebrow">All Records</div>
+      <h1 class="page-header__title">Evaluation History</h1>
+      <p class="page-header__subtitle">Search, filter, and compare ambassador candidates</p>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+      <input class="form-input" type="text" id="search-input" placeholder="Search by name…" oninput="applyFilters()">
+
+      <select class="form-select" id="filter-type" onchange="applyFilters()">
+        <option value="all">All Types</option>
+        <option value="white_glove">White-Glove Intro Source</option>
+        <option value="practitioner">Practitioner / Daily User</option>
+        <option value="credible_influencer">Credible Influencer</option>
+        <option value="code_influencer">Code-Based Affiliate</option>
+      </select>
+
+      <select class="form-select" id="filter-rec" onchange="applyFilters()">
+        <option value="all">All Recommendations</option>
+        <option value="yes">Strong Yes</option>
+        <option value="pilot">Yes — Pilot Test</option>
+        <option value="maybe">Strategic Maybe</option>
+        <option value="no_for_now">No for Now</option>
+        <option value="no">No</option>
+      </select>
+
+      <select class="form-select" id="sort-by" onchange="applyFilters()">
+        <option value="recent">Most Recent</option>
+        <option value="score_desc">Highest Score</option>
+        <option value="score_asc">Lowest Score</option>
+      </select>
+
+      <button class="btn btn--secondary btn--sm" id="compare-btn" onclick="showComparison()" style="display:none;">
+        Compare Selected (<span id="compare-count">0</span>)
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div id="table-container">
+      <!-- Populated by JS -->
+    </div>
+
+    <!-- Comparison View -->
+    <div id="comparison-container" class="hidden mt-4">
+      <div class="section-title">Side-by-Side Comparison</div>
+      <div class="comparison-grid" id="comparison-grid">
+        <!-- Populated by JS -->
+      </div>
+      <button class="btn btn--ghost btn--sm mt-2" onclick="clearComparison()">Clear Comparison</button>
+    </div>
+
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.getElementById('nav-mount').innerHTML = UI.renderNav('history');
+
+    const config = Storage.getConfig();
+    let allEvals = Storage.getEvaluations();
+    let filtered = [...allEvals];
+    let selectedIds = new Set();
+
+    function recGroup(rec) {
+      if (!rec) return '';
+      if (rec === 'Strong Yes') return 'yes';
+      if (rec === 'Yes — Pilot Test') return 'pilot';
+      if (rec === 'Strategic Maybe') return 'maybe';
+      if (rec === 'No for Now') return 'no_for_now';
+      return 'no';
+    }
+
+    function applyFilters() {
+      const search = document.getElementById('search-input').value.toLowerCase().trim();
+      const typeFilter = document.getElementById('filter-type').value;
+      const recFilter = document.getElementById('filter-rec').value;
+      const sortBy = document.getElementById('sort-by').value;
+
+      filtered = allEvals.filter(ev => {
+        const nameMatch = !search || (ev.candidate?.name || '').toLowerCase().includes(search);
+        const typeMatch = typeFilter === 'all' || ev.candidate?.type === typeFilter;
+        const recMatch = recFilter === 'all' || recGroup(ev.result?.recommendation) === recFilter;
+        return nameMatch && typeMatch && recMatch;
+      });
+
+      if (sortBy === 'recent') {
+        filtered.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      } else if (sortBy === 'score_desc') {
+        filtered.sort((a, b) => (b.result?.totalScore || 0) - (a.result?.totalScore || 0));
+      } else if (sortBy === 'score_asc') {
+        filtered.sort((a, b) => (a.result?.totalScore || 0) - (b.result?.totalScore || 0));
+      }
+
+      renderTable();
+    }
+
+    function toggleSelect(id) {
+      if (selectedIds.has(id)) {
+        selectedIds.delete(id);
+      } else {
+        if (selectedIds.size >= 3) {
+          UI.toast('You can compare up to 3 candidates at a time.', 'error');
+          return;
+        }
+        selectedIds.add(id);
+      }
+      updateCompareButton();
+      // Update checkbox state
+      const cb = document.getElementById(`cb-${id}`);
+      if (cb) cb.checked = selectedIds.has(id);
+    }
+
+    function updateCompareButton() {
+      const btn = document.getElementById('compare-btn');
+      const count = document.getElementById('compare-count');
+      count.textContent = selectedIds.size;
+      btn.style.display = selectedIds.size >= 2 ? '' : 'none';
+    }
+
+    function renderTable() {
+      const container = document.getElementById('table-container');
+
+      if (allEvals.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state__icon">◎</div>
+            <div class="empty-state__title">No evaluations yet</div>
+            <div class="empty-state__body">Start by evaluating your first ambassador candidate.</div>
+            <a href="evaluate.html" class="btn btn--primary">New Evaluation</a>
+          </div>
+        `;
+        return;
+      }
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state__icon">◎</div>
+            <div class="empty-state__title">No matches found</div>
+            <div class="empty-state__body">Try adjusting your search or filters.</div>
+          </div>
+        `;
+        return;
+      }
+
+      const rows = filtered.map((ev, idx) => {
+        const typeLabel = config.ambassadorTypes[ev.candidate?.type]?.label || ev.candidate?.type || '—';
+        const score = ev.result?.totalScore ?? 0;
+        const rec = ev.result?.recommendation ?? 'N/A';
+        const displayRec = ev.override ? ev.override.decision : rec;
+        const checked = selectedIds.has(ev.id);
+        return `
+          <tr>
+            <td style="width:40px;padding-left:12px;">
+              <input type="checkbox" id="cb-${ev.id}" ${checked ? 'checked' : ''}
+                onchange="toggleSelect('${ev.id}')"
+                style="accent-color:var(--accent);width:16px;height:16px;cursor:pointer;">
+            </td>
+            <td class="td-muted" style="width:40px;">${idx + 1}</td>
+            <td class="td-name">${ev.candidate?.name || '—'}</td>
+            <td><span class="type-badge">${typeLabel}</span></td>
+            <td>${UI.scoreBadge(score, displayRec)}</td>
+            <td>${UI.recPill(displayRec)}${ev.override ? ' <span style="font-size:0.7rem;color:var(--text-muted);">(override)</span>' : ''}</td>
+            <td class="td-muted">${ev.evaluator || '—'}</td>
+            <td class="td-muted">${UI.formatDate(ev.createdAt)}</td>
+            <td>
+              <div class="action-row">
+                <a href="results.html?id=${ev.id}" class="btn btn--ghost btn--sm">View</a>
+                <button class="btn btn--danger btn--sm" onclick="deleteEval('${ev.id}')">Delete</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:40px;"></th>
+                <th style="width:40px;">#</th>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Score</th>
+                <th>Recommendation</th>
+                <th>Evaluator</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div style="margin-top:0.75rem;font-size:0.8125rem;color:var(--text-sec);">
+          Showing ${filtered.length} of ${allEvals.length} evaluation${allEvals.length !== 1 ? 's' : ''}
+          ${selectedIds.size > 0 ? ` · ${selectedIds.size} selected` : ''}
+        </div>
+      `;
+    }
+
+    function deleteEval(id) {
+      if (UI.confirm('Delete this evaluation? This cannot be undone.')) {
+        Storage.deleteEvaluation(id);
+        selectedIds.delete(id);
+        allEvals = Storage.getEvaluations();
+        applyFilters();
+        updateCompareButton();
+        UI.toast('Evaluation deleted.');
+      }
+    }
+
+    function showComparison() {
+      if (selectedIds.size < 2) return;
+
+      const evals = [...selectedIds].map(id => Storage.getEvaluation(id)).filter(Boolean);
+      const grid = document.getElementById('comparison-grid');
+
+      grid.innerHTML = evals.map(ev => {
+        const typeLabel = config.ambassadorTypes[ev.candidate?.type]?.label || ev.candidate?.type || '—';
+        const displayRec = ev.override ? ev.override.decision : ev.result?.recommendation;
+        const color = UI.getRecommendationColor(displayRec);
+
+        const catRows = Object.entries(config.categories).map(([catKey, cat]) => {
+          const cs = ev.result?.categoryScores?.[catKey];
+          if (!cs) return '';
+          return `
+            <div class="comparison-cat-row">
+              <span class="comparison-cat-label">${cat.label}</span>
+              <span class="comparison-cat-score">${cs.raw.toFixed(1)}</span>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="comparison-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.25rem;">
+              <div class="comparison-card__name">${ev.candidate?.name || '—'}</div>
+              <div style="font-size:1.5rem;font-weight:800;color:${color};">${Math.round(ev.result?.totalScore || 0)}</div>
+            </div>
+            <div class="comparison-card__meta">
+              <span class="type-badge">${typeLabel}</span>
+              ${ev.candidate?.location ? `<span style="margin-left:6px;color:var(--text-sec);font-size:0.8rem;">${ev.candidate.location}</span>` : ''}
+            </div>
+            <div style="margin-bottom:0.75rem;">${UI.recPill(displayRec)}</div>
+            <div style="font-size:0.75rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-sec);margin-bottom:0.5rem;">Category Scores</div>
+            ${catRows}
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('comparison-container').classList.remove('hidden');
+      document.getElementById('comparison-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function clearComparison() {
+      selectedIds.clear();
+      updateCompareButton();
+      document.getElementById('comparison-container').classList.add('hidden');
+      renderTable();
+    }
+
+    // Init
+    applyFilters();
+  </script>
+</body>
+</html>
