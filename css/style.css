@@ -1587,11 +1587,21 @@ input[type="radio"].type-radio {
 }
 
 /* ─── Social Profiles Row ──────────────────────────────────────────────────── */
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
 .social-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.625rem;
+}
+
+.fetch-status {
+  width: 44px;
+  flex-shrink: 0;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 .social-icon {

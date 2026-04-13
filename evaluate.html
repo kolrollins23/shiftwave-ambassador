@@ -79,37 +79,47 @@
         <!-- Social Profiles + Follower Counts -->
         <div class="form-group">
           <label class="form-label">Social Profiles &amp; Follower Counts</label>
-          <p style="font-size:0.8125rem;color:var(--text-sec);margin-bottom:1rem;">Enter handles and fill in follower counts. The <strong>Social Reach score</strong> is auto-calculated from the total. Use the → buttons to open profiles quickly.</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.875rem;flex-wrap:wrap;gap:0.5rem;">
+            <p style="font-size:0.8125rem;color:var(--text-sec);margin:0;">Enter handles and click <strong>Fetch</strong> — follower counts are looked up automatically where possible.</p>
+            <button type="button" class="btn btn--primary btn--sm" id="fetch-all-btn" onclick="fetchAllFollowers()">
+              <span id="fetch-all-icon">⬇</span> Fetch All
+            </button>
+          </div>
 
           <div class="social-row">
             <span class="social-icon social-icon--ig">IG</span>
-            <input class="form-input" type="text" id="instagram" placeholder="@handle" style="flex:1.5;">
+            <input class="form-input" type="text" id="instagram" placeholder="@handle" style="flex:1.5;" onblur="autoFetchOnBlur('instagram')">
             <input class="form-input" type="number" id="followers-instagram" placeholder="Followers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
-            <button type="button" class="btn btn--ghost btn--sm" onclick="openProfile('instagram')">→</button>
+            <span class="fetch-status" id="status-instagram"></span>
+            <button type="button" class="btn btn--ghost btn--sm" onclick="fetchPlatform('instagram')" title="Fetch followers">⬇</button>
           </div>
           <div class="social-row">
             <span class="social-icon social-icon--li">LI</span>
-            <input class="form-input" type="text" id="linkedin" placeholder="linkedin.com/in/..." style="flex:1.5;">
+            <input class="form-input" type="text" id="linkedin" placeholder="linkedin.com/in/..." style="flex:1.5;" onblur="autoFetchOnBlur('linkedin')">
             <input class="form-input" type="number" id="followers-linkedin" placeholder="Followers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
-            <button type="button" class="btn btn--ghost btn--sm" onclick="openProfile('linkedin')">→</button>
+            <span class="fetch-status" id="status-linkedin"></span>
+            <button type="button" class="btn btn--ghost btn--sm" onclick="fetchPlatform('linkedin')" title="Fetch followers">⬇</button>
           </div>
           <div class="social-row">
             <span class="social-icon social-icon--x">X</span>
-            <input class="form-input" type="text" id="twitter" placeholder="@handle" style="flex:1.5;">
+            <input class="form-input" type="text" id="twitter" placeholder="@handle" style="flex:1.5;" onblur="autoFetchOnBlur('twitter')">
             <input class="form-input" type="number" id="followers-twitter" placeholder="Followers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
-            <button type="button" class="btn btn--ghost btn--sm" onclick="openProfile('twitter')">→</button>
+            <span class="fetch-status" id="status-twitter"></span>
+            <button type="button" class="btn btn--ghost btn--sm" onclick="fetchPlatform('twitter')" title="Fetch followers">⬇</button>
           </div>
           <div class="social-row">
             <span class="social-icon social-icon--yt">YT</span>
-            <input class="form-input" type="text" id="youtube" placeholder="@channel or URL" style="flex:1.5;">
+            <input class="form-input" type="text" id="youtube" placeholder="@channel or URL" style="flex:1.5;" onblur="autoFetchOnBlur('youtube')">
             <input class="form-input" type="number" id="followers-youtube" placeholder="Subscribers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
-            <button type="button" class="btn btn--ghost btn--sm" onclick="openProfile('youtube')">→</button>
+            <span class="fetch-status" id="status-youtube"></span>
+            <button type="button" class="btn btn--ghost btn--sm" onclick="fetchPlatform('youtube')" title="Fetch subscribers">⬇</button>
           </div>
           <div class="social-row">
             <span class="social-icon social-icon--tt">TT</span>
-            <input class="form-input" type="text" id="tiktok" placeholder="@handle" style="flex:1.5;">
+            <input class="form-input" type="text" id="tiktok" placeholder="@handle" style="flex:1.5;" onblur="autoFetchOnBlur('tiktok')">
             <input class="form-input" type="number" id="followers-tiktok" placeholder="Followers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
-            <button type="button" class="btn btn--ghost btn--sm" onclick="openProfile('tiktok')">→</button>
+            <span class="fetch-status" id="status-tiktok"></span>
+            <button type="button" class="btn btn--ghost btn--sm" onclick="fetchPlatform('tiktok')" title="Fetch followers">⬇</button>
           </div>
 
           <!-- Total + Auto Reach Score -->
@@ -310,6 +320,146 @@
       };
       const url = handles[platform];
       if (url) window.open(url, '_blank');
+    }
+
+    // ── Auto-fetch follower counts via CORS proxy
+    const CORS_PROXY = 'https://corsproxy.io/?';
+
+    function parseSubscriberText(text) {
+      if (!text) return null;
+      const t = text.replace(/,/g, '').trim();
+      const m = t.match(/^([\d.]+)\s*([KMBkmb]?)/);
+      if (!m) return null;
+      const n = parseFloat(m[1]);
+      const mult = { k:1e3, m:1e6, b:1e9 }[m[2].toLowerCase()] || 1;
+      return Math.round(n * mult);
+    }
+
+    async function fetchFollowerCount(platform, handle) {
+      const h = handle.replace('@','').trim();
+      if (!h) return null;
+
+      try {
+        if (platform === 'youtube') {
+          // Try oEmbed first (CORS-friendly, no proxy needed)
+          const ytUrl = h.startsWith('UC') || h.startsWith('http')
+            ? h : `https://www.youtube.com/@${h}`;
+          const proxyUrl = CORS_PROXY + encodeURIComponent(ytUrl);
+          const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+          if (!res.ok) return null;
+          const html = await res.text();
+          // Multiple patterns YouTube uses
+          let m = html.match(/"subscriberCountText":\{"accessibility":\{"accessibilityData":\{"label":"([\d.,KMB ]+)\s*subscriber/i);
+          if (m) return parseSubscriberText(m[1]);
+          m = html.match(/"subscriberCountText":\{"simpleText":"([^"]+)"\}/);
+          if (m) return parseSubscriberText(m[1]);
+          m = html.match(/"metadataParts":\[.*?"text":\{"content":"([\d.,KMBkmb]+)"\}.*?"text":\{"content":"subscribers"/i);
+          if (m) return parseSubscriberText(m[1]);
+          return null;
+        }
+
+        if (platform === 'tiktok') {
+          const proxyUrl = CORS_PROXY + encodeURIComponent(`https://www.tiktok.com/@${h}`);
+          const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+          if (!res.ok) return null;
+          const html = await res.text();
+          let m = html.match(/"followerCount":(\d+)/);
+          if (m) return parseInt(m[1]);
+          m = html.match(/"fans":(\d+)/);
+          if (m) return parseInt(m[1]);
+          // SIGI_STATE pattern
+          m = html.match(/"stats":\{[^}]*"followerCount":(\d+)/);
+          if (m) return parseInt(m[1]);
+          return null;
+        }
+
+        if (platform === 'instagram') {
+          const proxyUrl = CORS_PROXY + encodeURIComponent(`https://www.instagram.com/${h}/`);
+          const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+          if (!res.ok) return null;
+          const html = await res.text();
+          let m = html.match(/"edge_followed_by":\{"count":(\d+)\}/);
+          if (m) return parseInt(m[1]);
+          m = html.match(/"followers_count":(\d+)/);
+          if (m) return parseInt(m[1]);
+          // Meta description: "1,234 Followers"
+          m = html.match(/content="([\d,]+)\s+Followers/i);
+          if (m) return parseInt(m[1].replace(/,/g, ''));
+          return null;
+        }
+
+        if (platform === 'twitter') {
+          const proxyUrl = CORS_PROXY + encodeURIComponent(`https://x.com/${h}`);
+          const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+          if (!res.ok) return null;
+          const html = await res.text();
+          let m = html.match(/"normal_followers_count":(\d+)/);
+          if (m) return parseInt(m[1]);
+          m = html.match(/"followers_count":(\d+)/);
+          if (m) return parseInt(m[1]);
+          return null;
+        }
+
+        if (platform === 'linkedin') {
+          // LinkedIn blocks all scraping — skip
+          return null;
+        }
+      } catch (e) {
+        return null;
+      }
+      return null;
+    }
+
+    function setFetchStatus(platform, state) {
+      // state: 'loading' | 'success' | 'manual' | ''
+      const el = document.getElementById(`status-${platform}`);
+      if (!el) return;
+      const map = {
+        loading: '<span title="Fetching…" style="color:#888;font-size:1rem;animation:spin 1s linear infinite;display:inline-block;">⟳</span>',
+        success: '<span title="Auto-fetched" style="color:#16a34a;font-size:1rem;">✓</span>',
+        manual:  '<span title="Could not auto-fetch — enter manually" style="color:#d97706;font-size:0.8rem;">manual</span>',
+        '':      ''
+      };
+      el.innerHTML = map[state] || '';
+    }
+
+    async function fetchPlatform(platform) {
+      const handle = document.getElementById(platform === 'twitter' ? 'twitter' : platform)?.value?.trim();
+      if (!handle) return;
+      setFetchStatus(platform, 'loading');
+      const count = await fetchFollowerCount(platform, handle);
+      if (count !== null && count > 0) {
+        document.getElementById(`followers-${platform}`).value = count;
+        updateTotalFollowers();
+        setFetchStatus(platform, 'success');
+      } else {
+        setFetchStatus(platform, 'manual');
+      }
+    }
+
+    async function autoFetchOnBlur(platform) {
+      const handle = document.getElementById(platform === 'twitter' ? 'twitter' : platform)?.value?.trim();
+      const existingCount = document.getElementById(`followers-${platform}`)?.value;
+      // Only auto-fetch if handle is filled and no count yet
+      if (handle && !existingCount) {
+        await fetchPlatform(platform);
+      }
+    }
+
+    async function fetchAllFollowers() {
+      const btn = document.getElementById('fetch-all-btn');
+      const icon = document.getElementById('fetch-all-icon');
+      btn.disabled = true;
+      icon.textContent = '⟳';
+
+      const platforms = ['instagram', 'linkedin', 'twitter', 'youtube', 'tiktok'];
+      await Promise.all(platforms.map(p => {
+        const handle = document.getElementById(p === 'twitter' ? 'twitter' : p)?.value?.trim();
+        if (handle) return fetchPlatform(p);
+      }));
+
+      btn.disabled = false;
+      icon.textContent = '⬇';
     }
 
     // ── Render Ambassador Type Cards (multi-select checkboxes)
