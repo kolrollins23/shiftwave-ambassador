@@ -613,6 +613,34 @@ tbody td {
   min-width: 80px;
 }
 
+.slider-number-input {
+  width: 48px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  text-align: center;
+  padding: 2px 4px;
+  -moz-appearance: textfield;
+}
+.slider-number-input::-webkit-outer-spin-button,
+.slider-number-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+.slider-number-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: #fff8ee;
+}
+.slider-number-input:disabled {
+  color: var(--text-sec);
+  border-color: transparent;
+  background: transparent;
+  cursor: default;
+}
+
 .slider-help {
   font-size: 0.8125rem;
   color: var(--text-sec);

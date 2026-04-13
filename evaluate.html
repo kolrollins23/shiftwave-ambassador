@@ -513,7 +513,9 @@
               <div class="slider-header">
                 <span class="slider-label">${sf.label}${isAuto ? ' <span class="auto-badge">AUTO</span>' : ''}</span>
                 <div class="slider-value-display">
-                  <span class="slider-number" id="num-${sfKey}">${currentVal}</span>
+                  <input type="number" class="slider-number-input" id="num-${sfKey}"
+                    value="${currentVal}" min="0" max="10" step="1"
+                    ${isAuto ? 'disabled' : `oninput="updateFromInput('${sfKey}', '${catKey}', this)"`}>
                   <span class="slider-label-text" id="lbl-${sfKey}">${UI.scoreLabel(currentVal)}</span>
                 </div>
               </div>
@@ -558,7 +560,8 @@
 
     function updateSlider(sfKey, catKey, value) {
       scores[sfKey] = Number(value);
-      document.getElementById(`num-${sfKey}`).textContent = value;
+      const numInput = document.getElementById(`num-${sfKey}`);
+      if (numInput) numInput.value = value;
       document.getElementById(`lbl-${sfKey}`).textContent = UI.scoreLabel(value);
 
       // Update category average
@@ -567,6 +570,16 @@
       const avg = sfKeys.reduce((s, k) => s + (scores[k] !== undefined ? scores[k] : 5), 0) / sfKeys.length;
       const avgEl = document.getElementById(`cat-avg-${catKey}`);
       if (avgEl) avgEl.textContent = avg.toFixed(1);
+    }
+
+    function updateFromInput(sfKey, catKey, inputEl) {
+      let val = parseInt(inputEl.value, 10);
+      if (isNaN(val)) return;
+      val = Math.max(0, Math.min(10, val));   // clamp to 0–10
+      inputEl.value = val;
+      const slider = document.getElementById(`slider-${sfKey}`);
+      if (slider) slider.value = val;
+      updateSlider(sfKey, catKey, val);
     }
 
     // ── Step Navigation
