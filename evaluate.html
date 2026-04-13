@@ -59,7 +59,7 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Ambassador Type<span class="required">*</span></label>
+          <label class="form-label">Ambassador Type<span class="required">*</span> <span style="font-size:0.8rem;font-weight:400;color:var(--text-sec);">— select one or more</span></label>
           <div class="type-cards" id="type-cards">
             <!-- Rendered by JS -->
           </div>
@@ -76,14 +76,52 @@
           </div>
         </div>
 
-        <div class="form-cols">
-          <div class="form-group">
-            <label class="form-label" for="instagram">Instagram Handle</label>
-            <input class="form-input" type="text" id="instagram" placeholder="@handle">
+        <!-- Social Profiles + Follower Counts -->
+        <div class="form-group">
+          <label class="form-label">Social Profiles &amp; Follower Counts</label>
+          <p style="font-size:0.8125rem;color:var(--text-sec);margin-bottom:1rem;">Enter handles and fill in follower counts. The <strong>Social Reach score</strong> is auto-calculated from the total. Use the → buttons to open profiles quickly.</p>
+
+          <div class="social-row">
+            <span class="social-icon social-icon--ig">IG</span>
+            <input class="form-input" type="text" id="instagram" placeholder="@handle" style="flex:1.5;">
+            <input class="form-input" type="number" id="followers-instagram" placeholder="Followers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
+            <button type="button" class="btn btn--ghost btn--sm" onclick="openProfile('instagram')">→</button>
           </div>
-          <div class="form-group">
-            <label class="form-label" for="linkedin">LinkedIn URL</label>
-            <input class="form-input" type="text" id="linkedin" placeholder="linkedin.com/in/...">
+          <div class="social-row">
+            <span class="social-icon social-icon--li">LI</span>
+            <input class="form-input" type="text" id="linkedin" placeholder="linkedin.com/in/..." style="flex:1.5;">
+            <input class="form-input" type="number" id="followers-linkedin" placeholder="Followers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
+            <button type="button" class="btn btn--ghost btn--sm" onclick="openProfile('linkedin')">→</button>
+          </div>
+          <div class="social-row">
+            <span class="social-icon social-icon--x">X</span>
+            <input class="form-input" type="text" id="twitter" placeholder="@handle" style="flex:1.5;">
+            <input class="form-input" type="number" id="followers-twitter" placeholder="Followers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
+            <button type="button" class="btn btn--ghost btn--sm" onclick="openProfile('twitter')">→</button>
+          </div>
+          <div class="social-row">
+            <span class="social-icon social-icon--yt">YT</span>
+            <input class="form-input" type="text" id="youtube" placeholder="@channel or URL" style="flex:1.5;">
+            <input class="form-input" type="number" id="followers-youtube" placeholder="Subscribers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
+            <button type="button" class="btn btn--ghost btn--sm" onclick="openProfile('youtube')">→</button>
+          </div>
+          <div class="social-row">
+            <span class="social-icon social-icon--tt">TT</span>
+            <input class="form-input" type="text" id="tiktok" placeholder="@handle" style="flex:1.5;">
+            <input class="form-input" type="number" id="followers-tiktok" placeholder="Followers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
+            <button type="button" class="btn btn--ghost btn--sm" onclick="openProfile('tiktok')">→</button>
+          </div>
+
+          <!-- Total + Auto Reach Score -->
+          <div class="follower-total-bar" id="follower-total-bar">
+            <div>
+              <span class="follower-total-label">Total Followers / Subscribers</span>
+              <span class="follower-total-value" id="follower-total-display">0</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span style="font-size:0.8125rem;color:var(--text-sec);">Auto Reach Score:</span>
+              <span class="reach-score-badge" id="reach-score-badge">0 / 10</span>
+            </div>
           </div>
         </div>
 
@@ -220,15 +258,66 @@
 
     const config = Storage.getConfig();
     let currentStep = 1;
-    let selectedType = null;
+    let selectedTypes = [];   // now an array for multi-select
     const scores = {};
+    let totalFollowers = 0;
 
-    // ── Render Ambassador Type Cards
+    // ── Follower count helpers
+    function updateTotalFollowers() {
+      const ids = ['instagram','linkedin','twitter','youtube','tiktok'];
+      totalFollowers = ids.reduce((sum, id) => {
+        return sum + (Number(document.getElementById(`followers-${id}`)?.value) || 0);
+      }, 0);
+
+      // Display formatted total
+      const display = document.getElementById('follower-total-display');
+      if (display) display.textContent = formatFollowers(totalFollowers);
+
+      // Auto reach score
+      const reachScore = ScoringEngine.getReachScore(totalFollowers);
+      const badge = document.getElementById('reach-score-badge');
+      if (badge) {
+        badge.textContent = `${reachScore} / 10`;
+        badge.style.background = reachScore >= 7 ? 'rgba(22,163,74,0.12)' :
+                                  reachScore >= 5 ? 'rgba(217,119,6,0.12)' :
+                                  'rgba(220,38,38,0.08)';
+        badge.style.color = reachScore >= 7 ? '#16a34a' :
+                             reachScore >= 5 ? '#d97706' : '#dc2626';
+      }
+
+      // Update live social_reach slider if visible
+      const slider = document.getElementById('slider-social_reach');
+      if (slider) {
+        slider.value = reachScore;
+        document.getElementById('num-social_reach').textContent = reachScore;
+        document.getElementById('lbl-social_reach').textContent = UI.scoreLabel(reachScore);
+      }
+    }
+
+    function formatFollowers(n) {
+      if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(0) + 'K';
+      return n.toString();
+    }
+
+    function openProfile(platform) {
+      const handles = {
+        instagram: `https://instagram.com/${(document.getElementById('instagram').value || '').replace('@','')}`,
+        linkedin:  document.getElementById('linkedin').value || 'https://linkedin.com',
+        twitter:   `https://x.com/${(document.getElementById('twitter').value || '').replace('@','')}`,
+        youtube:   `https://youtube.com/${document.getElementById('youtube').value || ''}`,
+        tiktok:    `https://tiktok.com/@${(document.getElementById('tiktok').value || '').replace('@','')}`
+      };
+      const url = handles[platform];
+      if (url) window.open(url, '_blank');
+    }
+
+    // ── Render Ambassador Type Cards (multi-select checkboxes)
     function renderTypeCards() {
       const container = document.getElementById('type-cards');
       container.innerHTML = Object.entries(config.ambassadorTypes).map(([key, type]) => `
-        <div class="type-card${type.featured ? ' type-card--featured' : ''}" data-type="${key}" onclick="selectType('${key}')">
-          <input type="radio" class="type-radio" name="ambassador-type" value="${key}" id="type-${key}">
+        <div class="type-card${type.featured ? ' type-card--featured' : ''}" data-type="${key}" onclick="toggleType('${key}')">
+          <div class="type-card__check" id="check-${key}">✓</div>
           <div class="type-card__icon">${type.icon}</div>
           <div class="type-card__label">${type.label}</div>
           <div class="type-card__desc">${type.description}</div>
@@ -236,43 +325,53 @@
       `).join('');
     }
 
-    function selectType(key) {
-      selectedType = key;
-      document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
-      const card = document.querySelector(`.type-card[data-type="${key}"]`);
-      if (card) card.classList.add('selected');
-      // Re-render scoring if already on step 2
+    function toggleType(key) {
+      const idx = selectedTypes.indexOf(key);
+      if (idx > -1) {
+        selectedTypes.splice(idx, 1);
+      } else {
+        selectedTypes.push(key);
+      }
+      // Update card visuals
+      document.querySelectorAll('.type-card').forEach(c => {
+        const t = c.dataset.type;
+        c.classList.toggle('selected', selectedTypes.includes(t));
+      });
       if (currentStep === 2) renderScoringCategories();
     }
 
     // ── Render Scoring Categories
     function renderScoringCategories() {
       const container = document.getElementById('scoring-categories');
-      if (!selectedType) {
-        container.innerHTML = `<div class="callout callout--info"><span class="callout__icon">ℹ</span>Please go back and select an ambassador type first.</div>`;
+      if (selectedTypes.length === 0) {
+        container.innerHTML = `<div class="callout callout--info"><span class="callout__icon">ℹ</span>Please go back and select at least one ambassador type first.</div>`;
         return;
       }
 
-      const weights = config.weights[selectedType];
+      const blendedWeights = ScoringEngine.blendWeights(selectedTypes, config);
       container.innerHTML = Object.entries(config.categories).map(([catKey, cat]) => {
-        const weight = weights[catKey] || 0;
-        const isFeatured = catKey === 'reallife_access' && selectedType === 'practitioner';
+        const weight = Math.round((blendedWeights[catKey] || 0) * 10) / 10;
+        const isFeatured = catKey === 'reallife_access' && selectedTypes.includes('practitioner');
 
         const subFactorHtml = Object.entries(cat.subFactors).map(([sfKey, sf]) => {
-          const currentVal = scores[sfKey] !== undefined ? scores[sfKey] : 5;
+          const isAuto = sf.autoScored;
+          const currentVal = isAuto
+            ? ScoringEngine.getReachScore(totalFollowers)
+            : (scores[sfKey] !== undefined ? scores[sfKey] : 5);
           return `
-            <div class="slider-group">
+            <div class="slider-group${isAuto ? ' slider-group--auto' : ''}">
               <div class="slider-header">
-                <span class="slider-label">${sf.label}</span>
+                <span class="slider-label">${sf.label}${isAuto ? ' <span class="auto-badge">AUTO</span>' : ''}</span>
                 <div class="slider-value-display">
                   <span class="slider-number" id="num-${sfKey}">${currentVal}</span>
                   <span class="slider-label-text" id="lbl-${sfKey}">${UI.scoreLabel(currentVal)}</span>
                 </div>
               </div>
               <div class="slider-help">${sf.help}</div>
-              <input type="range" min="1" max="10" value="${currentVal}"
+              <input type="range" min="0" max="10" value="${currentVal}"
                 id="slider-${sfKey}"
-                oninput="updateSlider('${sfKey}', '${catKey}', this.value)">
+                ${isAuto ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `oninput="updateSlider('${sfKey}', '${catKey}', this.value)"`}>
+              ${isAuto ? `<div style="font-size:0.75rem;color:var(--text-sec);margin-top:0.25rem;">Based on ${formatFollowers(totalFollowers)} total followers across all platforms. Enter counts in Step 1 to update.</div>` : ''}
             </div>
           `;
         }).join('');
@@ -330,8 +429,8 @@
           alert('Please enter the candidate name.');
           return;
         }
-        if (!selectedType) {
-          alert('Please select an ambassador type.');
+        if (selectedTypes.length === 0) {
+          alert('Please select at least one ambassador type.');
           return;
         }
       }
@@ -368,7 +467,7 @@
       const profession = document.getElementById('profession').value.trim();
       const location = document.getElementById('location').value.trim();
       const instagram = document.getElementById('instagram').value.trim();
-      const typeLabel = config.ambassadorTypes[selectedType]?.label || selectedType;
+      const typeLabels = selectedTypes.map(t => config.ambassadorTypes[t]?.label || t).join(', ');
 
       // Candidate summary
       document.getElementById('review-candidate-summary').innerHTML = `
@@ -377,8 +476,8 @@
           <div class="review-summary-item__value">${candName || '—'}</div>
         </div>
         <div class="review-summary-item">
-          <div class="review-summary-item__label">Type</div>
-          <div class="review-summary-item__value"><span class="type-badge">${typeLabel}</span></div>
+          <div class="review-summary-item__label">Type(s)</div>
+          <div class="review-summary-item__value">${selectedTypes.map(t => `<span class="type-badge">${config.ambassadorTypes[t]?.label || t}</span>`).join(' ')}</div>
         </div>
         <div class="review-summary-item">
           <div class="review-summary-item__label">Profession</div>
@@ -389,8 +488,8 @@
           <div class="review-summary-item__value">${location || '—'}</div>
         </div>
         <div class="review-summary-item">
-          <div class="review-summary-item__label">Instagram</div>
-          <div class="review-summary-item__value">${instagram || '—'}</div>
+          <div class="review-summary-item__label">Total Followers</div>
+          <div class="review-summary-item__value">${formatFollowers(totalFollowers)}</div>
         </div>
         <div class="review-summary-item">
           <div class="review-summary-item__label">Evaluator</div>
@@ -399,11 +498,14 @@
       `;
 
       // Scores list
-      const weights = config.weights[selectedType];
+      const blendedWeights = ScoringEngine.blendWeights(selectedTypes, config);
       document.getElementById('review-scores-list').innerHTML = Object.entries(config.categories).map(([catKey, cat]) => {
         const sfKeys = Object.keys(cat.subFactors);
-        const avg = sfKeys.reduce((s, k) => s + (scores[k] !== undefined ? scores[k] : 5), 0) / sfKeys.length;
-        const weight = weights[catKey] || 0;
+        const avg = sfKeys.reduce((s, k) => {
+          if (cat.subFactors[k]?.autoScored) return s + ScoringEngine.getReachScore(totalFollowers);
+          return s + (scores[k] !== undefined ? scores[k] : 5);
+        }, 0) / sfKeys.length;
+        const weight = Math.round((blendedWeights[catKey] || 0) * 10) / 10;
         return `
           <div class="review-score-row">
             <span class="review-score-label">${cat.label} <span style="color:var(--text-muted);font-weight:400;font-size:0.8em;">(${weight}%)</span></span>
@@ -420,7 +522,7 @@
         pricing_mismatch: document.getElementById('flag-pricing').checked
       };
 
-      const result = ScoringEngine.calculate(scores, selectedType, config, redFlags);
+      const result = ScoringEngine.calculate(scores, selectedTypes, config, redFlags, totalFollowers);
 
       document.getElementById('review-estimated-score').textContent = Math.round(result.totalScore);
       document.getElementById('review-rec-pill').innerHTML = UI.recPill(result.recommendation);
@@ -458,15 +560,20 @@
         pricing_mismatch: document.getElementById('flag-pricing').checked
       };
 
-      const result = ScoringEngine.calculate(scores, selectedType, config, redFlags);
+      const result = ScoringEngine.calculate(scores, selectedTypes, config, redFlags, totalFollowers);
 
       const candidate = {
         name: document.getElementById('candidate-name').value.trim(),
-        type: selectedType,
+        type: selectedTypes,
+        typeLabel: selectedTypes.map(t => config.ambassadorTypes[t]?.label || t).join(' + '),
         profession: document.getElementById('profession').value.trim(),
         location: document.getElementById('location').value.trim(),
         instagram: document.getElementById('instagram').value.trim(),
         linkedin: document.getElementById('linkedin').value.trim(),
+        twitter: document.getElementById('twitter').value.trim(),
+        youtube: document.getElementById('youtube').value.trim(),
+        tiktok: document.getElementById('tiktok').value.trim(),
+        totalFollowers,
         notes: document.getElementById('initial-notes').value.trim()
       };
 

@@ -157,6 +157,11 @@ window.DEFAULT_CONFIG = {
         b2b_reach: {
           label: "B2B Reach",
           help: "Can they influence other businesses or practitioners to carry/use Shiftwave?"
+        },
+        social_reach: {
+          label: "Social Reach (Auto-Scored)",
+          help: "Total followers/subscribers across all platforms. Score is set automatically based on total reach entered in Step 1.",
+          autoScored: true
         }
       }
     },

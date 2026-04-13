@@ -79,9 +79,41 @@ window.Storage = {
 
 window.ScoringEngine = {
 
-  calculate(scores, ambassadorType, config, redFlags) {
-    const weights = config.weights[ambassadorType];
-    if (!weights) throw new Error(`Unknown ambassador type: ${ambassadorType}`);
+  // Convert total follower count to a 0-10 reach score
+  // Anchors: 200k → 5, 1M → 7, 10M+ → 10
+  getReachScore(totalFollowers) {
+    const n = Number(totalFollowers) || 0;
+    if (n === 0)          return 0;
+    if (n < 5000)         return 1;
+    if (n < 20000)        return 2;
+    if (n < 50000)        return 3;
+    if (n < 200000)       return 4;
+    if (n < 500000)       return 5;
+    if (n < 1000000)      return 6;
+    if (n < 2500000)      return 7;
+    if (n < 5000000)      return 8;
+    if (n < 10000000)     return 9;
+    return 10;
+  },
+
+  // Blend weights across multiple selected ambassador types (average)
+  blendWeights(selectedTypes, config) {
+    if (!Array.isArray(selectedTypes) || selectedTypes.length === 0) return {};
+    if (selectedTypes.length === 1) return config.weights[selectedTypes[0]] || {};
+    const blended = {};
+    Object.keys(config.categories).forEach(catKey => {
+      const sum = selectedTypes.reduce((acc, type) => acc + (config.weights[type]?.[catKey] || 0), 0);
+      blended[catKey] = sum / selectedTypes.length;
+    });
+    return blended;
+  },
+
+  // ambassadorType can be a string (single) or array (multi-select)
+  calculate(scores, ambassadorType, config, redFlags, totalFollowers) {
+    const typeArr = Array.isArray(ambassadorType) ? ambassadorType : [ambassadorType];
+    const weights = this.blendWeights(typeArr, config);
+    if (!weights || Object.keys(weights).length === 0)
+      throw new Error(`Unknown ambassador type: ${ambassadorType}`);
 
     const categoryScores = {};
     let totalScore = 0;
@@ -90,8 +122,13 @@ window.ScoringEngine = {
       const subFactors = Object.keys(category.subFactors);
       const weight = weights[catKey] || 0;
 
-      // Only include sub-factors that have scores
-      const subScores = subFactors.map(sf => scores[sf] !== undefined ? Number(scores[sf]) : 5);
+      // Only include sub-factors that have scores; auto-score social_reach from followers
+      const subScores = subFactors.map(sf => {
+        if (category.subFactors[sf]?.autoScored) {
+          return this.getReachScore(totalFollowers || 0);
+        }
+        return scores[sf] !== undefined ? Number(scores[sf]) : 5;
+      });
       const rawScore = subScores.length > 0
         ? subScores.reduce((a, b) => a + b, 0) / subScores.length
         : 0;
@@ -166,7 +203,7 @@ window.ScoringEngine = {
 
   generateExplanation(result, candidate, config) {
     const { categoryScores, recommendation, hardStopTriggered, hardStopType } = result;
-    const ambassadorType = candidate.type;
+    const ambassadorType = Array.isArray(candidate.type) ? candidate.type[0] : candidate.type;
 
     // Sort categories by performance ratio (contribution / weight)
     const ratios = Object.entries(categoryScores)
@@ -283,10 +320,12 @@ window.UI = {
 
   scoreLabel(score) {
     const s = Number(score);
-    if (s <= 3) return 'Poor';
-    if (s <= 5) return 'Below Average';
-    if (s <= 7) return 'Average';
-    if (s <= 9) return 'Good';
+    if (s === 0)  return 'No Data';
+    if (s <= 2)   return 'Poor';
+    if (s <= 4)   return 'Below Average';
+    if (s === 5)  return 'Average';
+    if (s <= 7)   return 'Good';
+    if (s <= 9)   return 'Strong';
     return 'Excellent';
   },
 
