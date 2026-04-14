@@ -246,6 +246,13 @@
         </div>
       </div>
 
+      <!-- Skipped Questions Summary -->
+      <div class="card mb-3" id="review-skipped-card" style="display:none;">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:0.25rem;">Skipped Questions</h2>
+        <p style="font-size:0.875rem;color:var(--text-sec);margin-bottom:0.75rem;">These sub-factors were excluded from the score. You can answer them later from the results page.</p>
+        <div class="skipped-questions-list" id="review-skipped-list"></div>
+      </div>
+
       <div class="card mb-3" id="review-flags-card" style="display:none;">
         <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:1rem;color:var(--red);">Red Flags</h2>
         <div id="review-flags-list"></div>
@@ -270,6 +277,7 @@
     let currentStep = 1;
     let selectedTypes = [];   // now an array for multi-select
     const scores = {};
+    const skippedFactors = {};  // { [sfKey]: true } for sub-factors excluded from scoring
     let totalFollowers = 0;
 
     // ── Follower count helpers
@@ -560,32 +568,45 @@
 
         const subFactorHtml = Object.entries(cat.subFactors).map(([sfKey, sf]) => {
           const isAuto = sf.autoScored;
+          const isSkipped = !isAuto && !!skippedFactors[sfKey];
           const currentVal = isAuto
             ? ScoringEngine.getReachScore(totalFollowers)
             : (scores[sfKey] !== undefined ? scores[sfKey] : 5);
           return `
-            <div class="slider-group${isAuto ? ' slider-group--auto' : ''}">
+            <div class="slider-group${isAuto ? ' slider-group--auto' : ''}${isSkipped ? ' slider-group--skipped' : ''}" id="sg-${sfKey}">
               <div class="slider-header">
                 <span class="slider-label">${sf.label}${isAuto ? ' <span class="auto-badge">AUTO</span>' : ''}</span>
                 <div class="slider-value-display">
+                  ${!isAuto ? `<button class="skip-btn${isSkipped ? ' skip-btn--active' : ''}" id="skipbtn-${sfKey}"
+                    onclick="toggleSkip('${sfKey}', '${catKey}')"
+                    title="${isSkipped ? 'Click to include this question' : 'Click to skip this question'}">
+                    ${isSkipped ? '+ Include' : 'Skip'}
+                  </button>` : ''}
                   <input type="number" class="slider-number-input" id="num-${sfKey}"
-                    value="${currentVal}" min="0" max="10" step="1"
-                    ${isAuto ? 'disabled' : `oninput="updateFromInput('${sfKey}', '${catKey}', this)"`}>
-                  <span class="slider-label-text" id="lbl-${sfKey}">${UI.scoreLabel(currentVal)}</span>
+                    value="${isSkipped ? '' : currentVal}" min="0" max="10" step="1"
+                    placeholder="${isSkipped ? '—' : ''}"
+                    ${isAuto || isSkipped ? 'disabled' : `oninput="updateFromInput('${sfKey}', '${catKey}', this)"`}>
+                  <span class="slider-label-text" id="lbl-${sfKey}">${isSkipped ? 'Skipped' : UI.scoreLabel(currentVal)}</span>
                 </div>
               </div>
               <div class="slider-help">${sf.help}</div>
               <input type="range" min="0" max="10" value="${currentVal}"
                 id="slider-${sfKey}"
-                ${isAuto ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `oninput="updateSlider('${sfKey}', '${catKey}', this.value)"`}>
+                ${isAuto || isSkipped ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `oninput="updateSlider('${sfKey}', '${catKey}', this.value)"`}>
               ${isAuto ? `<div style="font-size:0.75rem;color:var(--text-sec);margin-top:0.25rem;">Based on ${formatFollowers(totalFollowers)} total followers across all platforms. Enter counts in Step 1 to update.</div>` : ''}
             </div>
           `;
         }).join('');
 
-        // Calculate current category average
+        // Category average: only count non-skipped sub-factors
         const sfKeys = Object.keys(cat.subFactors);
-        const avg = sfKeys.reduce((s, k) => s + (scores[k] !== undefined ? scores[k] : 5), 0) / sfKeys.length;
+        const activeSfKeys = sfKeys.filter(k => cat.subFactors[k]?.autoScored || !skippedFactors[k]);
+        const avg = activeSfKeys.length > 0
+          ? activeSfKeys.reduce((s, k) => {
+              if (cat.subFactors[k]?.autoScored) return s + ScoringEngine.getReachScore(totalFollowers);
+              return s + (scores[k] !== undefined ? scores[k] : 5);
+            }, 0) / activeSfKeys.length
+          : null;
 
         return `
           <div class="category-section${isFeatured ? ' category-section--featured' : ''}" id="cat-section-${catKey}">
@@ -601,8 +622,8 @@
               </div>
               <div class="category-score-preview">
                 <div class="category-score-preview__label">Avg</div>
-                <div class="category-score-preview__value" id="cat-avg-${catKey}">${avg.toFixed(1)}</div>
-                <div class="category-score-preview__sub">/ 10</div>
+                <div class="category-score-preview__value" id="cat-avg-${catKey}">${avg !== null ? avg.toFixed(1) : '—'}</div>
+                <div class="category-score-preview__sub">${avg !== null ? '/ 10' : 'skipped'}</div>
               </div>
             </div>
             <div class="category-body">
@@ -613,18 +634,32 @@
       }).join('');
     }
 
+    function updateCategoryAvg(catKey) {
+      const cat = config.categories[catKey];
+      const sfKeys = Object.keys(cat.subFactors);
+      const activeSfs = sfKeys.filter(k => cat.subFactors[k]?.autoScored || !skippedFactors[k]);
+      const avgEl = document.getElementById(`cat-avg-${catKey}`);
+      const subEl = avgEl?.nextElementSibling;
+      if (!avgEl) return;
+      if (activeSfs.length === 0) {
+        avgEl.textContent = '—';
+        if (subEl) subEl.textContent = 'skipped';
+      } else {
+        const avg = activeSfs.reduce((s, k) => {
+          if (cat.subFactors[k]?.autoScored) return s + ScoringEngine.getReachScore(totalFollowers);
+          return s + (scores[k] !== undefined ? scores[k] : 5);
+        }, 0) / activeSfs.length;
+        avgEl.textContent = avg.toFixed(1);
+        if (subEl) subEl.textContent = '/ 10';
+      }
+    }
+
     function updateSlider(sfKey, catKey, value) {
       scores[sfKey] = Number(value);
       const numInput = document.getElementById(`num-${sfKey}`);
       if (numInput) numInput.value = value;
       document.getElementById(`lbl-${sfKey}`).textContent = UI.scoreLabel(value);
-
-      // Update category average
-      const cat = config.categories[catKey];
-      const sfKeys = Object.keys(cat.subFactors);
-      const avg = sfKeys.reduce((s, k) => s + (scores[k] !== undefined ? scores[k] : 5), 0) / sfKeys.length;
-      const avgEl = document.getElementById(`cat-avg-${catKey}`);
-      if (avgEl) avgEl.textContent = avg.toFixed(1);
+      updateCategoryAvg(catKey);
     }
 
     function updateFromInput(sfKey, catKey, inputEl) {
@@ -635,6 +670,50 @@
       const slider = document.getElementById(`slider-${sfKey}`);
       if (slider) slider.value = val;
       updateSlider(sfKey, catKey, val);
+    }
+
+    function toggleSkip(sfKey, catKey) {
+      const wasSkipped = !!skippedFactors[sfKey];
+      if (wasSkipped) {
+        delete skippedFactors[sfKey];
+      } else {
+        skippedFactors[sfKey] = true;
+      }
+      const isNowSkipped = !wasSkipped;
+
+      // Toggle row appearance
+      const sg = document.getElementById(`sg-${sfKey}`);
+      if (sg) sg.classList.toggle('slider-group--skipped', isNowSkipped);
+
+      // Toggle skip button label/style
+      const btn = document.getElementById(`skipbtn-${sfKey}`);
+      if (btn) {
+        btn.textContent = isNowSkipped ? '+ Include' : 'Skip';
+        btn.classList.toggle('skip-btn--active', isNowSkipped);
+        btn.title = isNowSkipped ? 'Click to include this question' : 'Click to skip this question';
+      }
+
+      // Toggle slider and number input
+      const slider = document.getElementById(`slider-${sfKey}`);
+      const numInput = document.getElementById(`num-${sfKey}`);
+      const lbl = document.getElementById(`lbl-${sfKey}`);
+      if (isNowSkipped) {
+        if (slider) { slider.disabled = true; slider.style.opacity = '0.5'; }
+        if (numInput) { numInput.disabled = true; numInput.value = ''; numInput.placeholder = '—'; }
+        if (lbl) lbl.textContent = 'Skipped';
+      } else {
+        if (slider) { slider.disabled = false; slider.style.opacity = ''; }
+        if (numInput) {
+          numInput.disabled = false;
+          numInput.placeholder = '';
+          const val = scores[sfKey] !== undefined ? scores[sfKey] : 5;
+          numInput.value = val;
+          if (slider) slider.value = val;
+        }
+        if (lbl) lbl.textContent = UI.scoreLabel(scores[sfKey] !== undefined ? scores[sfKey] : 5);
+      }
+
+      updateCategoryAvg(catKey);
     }
 
     // ── Step Navigation
@@ -719,18 +798,45 @@
       const blendedWeights = ScoringEngine.blendWeights(selectedTypes, config);
       document.getElementById('review-scores-list').innerHTML = Object.entries(config.categories).map(([catKey, cat]) => {
         const sfKeys = Object.keys(cat.subFactors);
-        const avg = sfKeys.reduce((s, k) => {
-          if (cat.subFactors[k]?.autoScored) return s + ScoringEngine.getReachScore(totalFollowers);
-          return s + (scores[k] !== undefined ? scores[k] : 5);
-        }, 0) / sfKeys.length;
+        const activeSfs = sfKeys.filter(k => cat.subFactors[k]?.autoScored || !skippedFactors[k]);
+        const skippedCount = sfKeys.filter(k => !cat.subFactors[k]?.autoScored && !!skippedFactors[k]).length;
+        const avg = activeSfs.length > 0
+          ? activeSfs.reduce((s, k) => {
+              if (cat.subFactors[k]?.autoScored) return s + ScoringEngine.getReachScore(totalFollowers);
+              return s + (scores[k] !== undefined ? scores[k] : 5);
+            }, 0) / activeSfs.length
+          : null;
         const weight = Math.round((blendedWeights[catKey] || 0) * 10) / 10;
         return `
           <div class="review-score-row">
-            <span class="review-score-label">${cat.label} <span style="color:var(--text-muted);font-weight:400;font-size:0.8em;">(${weight}%)</span></span>
-            <span class="review-score-value">${avg.toFixed(1)} / 10</span>
+            <span class="review-score-label">${cat.label} <span style="color:var(--text-muted);font-weight:400;font-size:0.8em;">(${weight}%)</span>${skippedCount > 0 ? `<span class="skipped-badge">${skippedCount} skipped</span>` : ''}</span>
+            <span class="review-score-value">${avg !== null ? avg.toFixed(1) + ' / 10' : '<span style="color:#d97706;">Skipped</span>'}</span>
           </div>
         `;
       }).join('');
+
+      // Skipped questions list
+      const allSkipped = [];
+      Object.entries(config.categories).forEach(([catKey, cat]) => {
+        Object.entries(cat.subFactors).forEach(([sfKey, sf]) => {
+          if (skippedFactors[sfKey] && !sf.autoScored) {
+            allSkipped.push({ catLabel: cat.label, sfLabel: sf.label });
+          }
+        });
+      });
+      const skippedCard = document.getElementById('review-skipped-card');
+      if (allSkipped.length > 0) {
+        skippedCard.style.display = '';
+        document.getElementById('review-skipped-list').innerHTML = allSkipped.map(item => `
+          <div class="skipped-question-item">
+            <span class="skipped-question-item__cat">${item.catLabel}</span>
+            <span style="color:var(--text-muted)">›</span>
+            <span class="skipped-question-item__label">${item.sfLabel}</span>
+          </div>
+        `).join('');
+      } else {
+        skippedCard.style.display = 'none';
+      }
 
       // Live score calculation
       const redFlags = {
@@ -740,9 +846,10 @@
         pricing_mismatch: document.getElementById('flag-pricing').checked
       };
 
-      const result = ScoringEngine.calculate(scores, selectedTypes, config, redFlags, totalFollowers);
+      const result = ScoringEngine.calculate(scores, selectedTypes, config, redFlags, totalFollowers, skippedFactors);
 
-      document.getElementById('review-estimated-score').textContent = Math.round(result.totalScore);
+      document.getElementById('review-estimated-score').textContent = Math.round(result.totalScore)
+        + (result.isPartial ? ' *' : '');
       document.getElementById('review-rec-pill').innerHTML = UI.recPill(result.recommendation);
 
       // Flags
@@ -778,7 +885,7 @@
         pricing_mismatch: document.getElementById('flag-pricing').checked
       };
 
-      const result = ScoringEngine.calculate(scores, selectedTypes, config, redFlags, totalFollowers);
+      const result = ScoringEngine.calculate(scores, selectedTypes, config, redFlags, totalFollowers, skippedFactors);
 
       const candidate = {
         name: document.getElementById('candidate-name').value.trim(),
@@ -801,6 +908,7 @@
         evaluator: document.getElementById('evaluator').value.trim(),
         candidate,
         scores: Object.assign({}, scores),
+        skippedFactors: Object.assign({}, skippedFactors),
         redFlags,
         compensationStructure: document.getElementById('comp-structure').value,
         evaluatorNotes: document.getElementById('evaluator-notes').value.trim(),
@@ -808,10 +916,10 @@
         override: null
       };
 
-      // Fill in defaults for any unscored sub-factors
+      // Fill in defaults (5) for any non-skipped sub-factors the user never touched
       for (const [catKey, cat] of Object.entries(config.categories)) {
         for (const sfKey of Object.keys(cat.subFactors)) {
-          if (evaluation.scores[sfKey] === undefined) {
+          if (!evaluation.skippedFactors[sfKey] && evaluation.scores[sfKey] === undefined) {
             evaluation.scores[sfKey] = 5;
           }
         }

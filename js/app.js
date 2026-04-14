@@ -109,45 +109,85 @@ window.ScoringEngine = {
   },
 
   // ambassadorType can be a string (single) or array (multi-select)
-  calculate(scores, ambassadorType, config, redFlags, totalFollowers) {
+  // skipped: { [sfKey]: true } — sub-factors explicitly excluded from scoring
+  // Scoring is normalized so that skipped questions don't count as zeros:
+  //   finalScore = Σ(catAvg_i/10 * weight_i) / Σ(weight_i for active cats) * 100
+  calculate(scores, ambassadorType, config, redFlags, totalFollowers, skipped = {}) {
     const typeArr = Array.isArray(ambassadorType) ? ambassadorType : [ambassadorType];
     const weights = this.blendWeights(typeArr, config);
     if (!weights || Object.keys(weights).length === 0)
       throw new Error(`Unknown ambassador type: ${ambassadorType}`);
 
     const categoryScores = {};
-    let totalScore = 0;
+    let weightedSum = 0;   // Σ (rawScore/10 * weight) for active (non-fully-skipped) categories
+    let activeWeight = 0;  // Σ weight for categories with ≥1 answered sub-factor
 
     for (const [catKey, category] of Object.entries(config.categories)) {
       const subFactors = Object.keys(category.subFactors);
       const weight = weights[catKey] || 0;
 
-      // Only include sub-factors that have scores; auto-score social_reach from followers
-      const subScores = subFactors.map(sf => {
+      // Auto-scored sub-factors are never skippable; manual ones may be skipped
+      const activeSfs = subFactors.filter(sf =>
+        category.subFactors[sf]?.autoScored || !skipped[sf]
+      );
+      const skippedSfs = subFactors.filter(sf =>
+        !category.subFactors[sf]?.autoScored && !!skipped[sf]
+      );
+
+      if (activeSfs.length === 0) {
+        // Entire category skipped — exclude its weight from normalization
+        categoryScores[catKey] = {
+          raw: null,
+          contribution: 0,
+          normalizedContribution: 0,
+          weight,
+          fullySkipped: true,
+          skippedSubFactors: skippedSfs
+        };
+        continue;
+      }
+
+      const subScores = activeSfs.map(sf => {
         if (category.subFactors[sf]?.autoScored) {
           return this.getReachScore(totalFollowers || 0);
         }
         return scores[sf] !== undefined ? Number(scores[sf]) : 5;
       });
-      const rawScore = subScores.length > 0
-        ? subScores.reduce((a, b) => a + b, 0) / subScores.length
-        : 0;
 
+      const rawScore = subScores.reduce((a, b) => a + b, 0) / subScores.length;
       const contribution = (rawScore / 10) * weight;
 
       categoryScores[catKey] = {
         raw: Math.round(rawScore * 10) / 10,
         contribution: Math.round(contribution * 100) / 100,
-        weight
+        normalizedContribution: 0, // back-filled after loop
+        weight,
+        fullySkipped: false,
+        skippedSubFactors: skippedSfs
       };
 
-      totalScore += contribution;
+      weightedSum += contribution;
+      activeWeight += weight;
     }
 
-    totalScore = Math.round(totalScore * 10) / 10;
+    // Normalize: scale to [0,100] based only on the weight of answered categories
+    let totalScore = activeWeight > 0
+      ? (weightedSum / activeWeight) * 100
+      : 0;
 
-    // Clamp to 0-100
+    totalScore = Math.round(totalScore * 10) / 10;
     totalScore = Math.max(0, Math.min(100, totalScore));
+
+    // Back-fill each category's normalized contribution for display in results
+    for (const cs of Object.values(categoryScores)) {
+      if (!cs.fullySkipped && activeWeight > 0) {
+        cs.normalizedContribution = Math.round((cs.contribution / activeWeight) * 100 * 100) / 100;
+      }
+    }
+
+    // Count total skipped sub-factors
+    const totalSkipped = Object.values(categoryScores)
+      .reduce((sum, cs) => sum + (cs.skippedSubFactors?.length || 0), 0);
 
     // Hard stop checks
     let hardStopTriggered = false;
@@ -197,7 +237,9 @@ window.ScoringEngine = {
       recommendationColor,
       hardStopTriggered,
       hardStopType,
-      configVersion: config.version
+      configVersion: config.version,
+      totalSkipped,
+      isPartial: totalSkipped > 0
     };
   },
 
@@ -205,9 +247,9 @@ window.ScoringEngine = {
     const { categoryScores, recommendation, hardStopTriggered, hardStopType } = result;
     const ambassadorType = Array.isArray(candidate.type) ? candidate.type[0] : candidate.type;
 
-    // Sort categories by performance ratio (contribution / weight)
+    // Sort categories by performance ratio — exclude fully-skipped categories
     const ratios = Object.entries(categoryScores)
-      .filter(([, cs]) => cs.weight > 0)
+      .filter(([, cs]) => cs.weight > 0 && !cs.fullySkipped && cs.raw !== null)
       .map(([key, cs]) => ({
         key,
         ratio: cs.weight > 0 ? cs.raw / 10 : 0,
