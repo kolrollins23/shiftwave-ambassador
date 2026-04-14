@@ -211,10 +211,12 @@ window.ScoringEngine = {
     let recommendationColor = '#ef4444';
 
     if (!hardStopTriggered) {
+      // Use the rounded integer score for threshold matching — same value shown in the UI
+      const roundedScore = Math.round(totalScore);
       const threshold = config.thresholds
         .slice()
         .sort((a, b) => b.min - a.min)
-        .find(t => totalScore >= t.min && totalScore <= t.max);
+        .find(t => roundedScore >= t.min && roundedScore <= t.max);
 
       if (threshold) {
         recommendation = threshold.label;
