@@ -322,17 +322,47 @@
       if (url) window.open(url, '_blank');
     }
 
-    // ── Auto-fetch follower counts via CORS proxy
-    const CORS_PROXY = 'https://corsproxy.io/?';
+    // ── Auto-fetch follower counts via CORS proxies
+    // Multiple proxies tried in order — first success wins
+    const CORS_PROXIES = [
+      url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+      url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    ];
 
-    function parseSubscriberText(text) {
+    async function proxyFetch(url, timeout = 9000) {
+      for (const makeProxy of CORS_PROXIES) {
+        try {
+          const res = await fetch(makeProxy(url), { signal: AbortSignal.timeout(timeout) });
+          if (res.ok) {
+            const text = await res.text();
+            if (text && text.length > 200) return text;
+          }
+        } catch (e) { /* try next proxy */ }
+      }
+      return null;
+    }
+
+    function parseCount(text) {
       if (!text) return null;
-      const t = text.replace(/,/g, '').trim();
+      const t = String(text).replace(/,/g, '').trim();
       const m = t.match(/^([\d.]+)\s*([KMBkmb]?)/);
       if (!m) return null;
       const n = parseFloat(m[1]);
       const mult = { k:1e3, m:1e6, b:1e9 }[m[2].toLowerCase()] || 1;
-      return Math.round(n * mult);
+      const result = Math.round(n * mult);
+      return result > 0 ? result : null;
+    }
+
+    function firstMatch(html, ...patterns) {
+      for (const p of patterns) {
+        const m = html.match(p);
+        if (m && m[1]) {
+          const raw = m[1].replace(/,/g, '').trim();
+          const n = parseCount(raw) || parseInt(raw);
+          if (n > 0) return n;
+        }
+      }
+      return null;
     }
 
     async function fetchFollowerCount(platform, handle) {
@@ -340,70 +370,95 @@
       if (!h) return null;
 
       try {
+
+        // ── YouTube ──────────────────────────────────────────
         if (platform === 'youtube') {
-          // Try oEmbed first (CORS-friendly, no proxy needed)
-          const ytUrl = h.startsWith('UC') || h.startsWith('http')
-            ? h : `https://www.youtube.com/@${h}`;
-          const proxyUrl = CORS_PROXY + encodeURIComponent(ytUrl);
-          const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
-          if (!res.ok) return null;
-          const html = await res.text();
-          // Multiple patterns YouTube uses
-          let m = html.match(/"subscriberCountText":\{"accessibility":\{"accessibilityData":\{"label":"([\d.,KMB ]+)\s*subscriber/i);
-          if (m) return parseSubscriberText(m[1]);
-          m = html.match(/"subscriberCountText":\{"simpleText":"([^"]+)"\}/);
-          if (m) return parseSubscriberText(m[1]);
-          m = html.match(/"metadataParts":\[.*?"text":\{"content":"([\d.,KMBkmb]+)"\}.*?"text":\{"content":"subscribers"/i);
-          if (m) return parseSubscriberText(m[1]);
-          return null;
+          const ytUrl = `https://www.youtube.com/@${h}`;
+          const html = await proxyFetch(ytUrl);
+          if (!html) return null;
+          // ytInitialData carries subscriber count in several formats
+          return firstMatch(html,
+            /"subscriberCountText":\{"accessibility":\{"accessibilityData":\{"label":"([\d.,KMB ]+)\s*subscriber/i,
+            /"subscriberCountText":\{"simpleText":"([^"]+)"\}/,
+            /"subscriberCountText":\{"runs":\[\{"text":"([^"]+)"\}/,
+            /,"([\d.]+[KMBkmb]?) subscribers"/i,
+            /"text":"([\d.]+[KMBkmb]+)","accessibility":\{"accessibilityData":\{"label":"[^"]*subscriber/i
+          );
         }
 
+        // ── TikTok ───────────────────────────────────────────
         if (platform === 'tiktok') {
-          const proxyUrl = CORS_PROXY + encodeURIComponent(`https://www.tiktok.com/@${h}`);
-          const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
-          if (!res.ok) return null;
-          const html = await res.text();
-          let m = html.match(/"followerCount":(\d+)/);
-          if (m) return parseInt(m[1]);
-          m = html.match(/"fans":(\d+)/);
-          if (m) return parseInt(m[1]);
-          // SIGI_STATE pattern
-          m = html.match(/"stats":\{[^}]*"followerCount":(\d+)/);
-          if (m) return parseInt(m[1]);
-          return null;
+          const html = await proxyFetch(`https://www.tiktok.com/@${h}`);
+          if (!html) return null;
+          // TikTok embeds UNIVERSAL_DATA / SIGI_STATE JSON in <script> tags
+          return firstMatch(html,
+            /"followerCount":(\d+)/,
+            /"fans":(\d+)/,
+            /"stats":\{"followerCount":(\d+)/,
+            /"follower_count":(\d+)/,
+            /"digg_count":\d+,"follower_count":(\d+)/
+          );
         }
 
+        // ── Instagram ────────────────────────────────────────
         if (platform === 'instagram') {
-          const proxyUrl = CORS_PROXY + encodeURIComponent(`https://www.instagram.com/${h}/`);
-          const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
-          if (!res.ok) return null;
-          const html = await res.text();
-          let m = html.match(/"edge_followed_by":\{"count":(\d+)\}/);
-          if (m) return parseInt(m[1]);
-          m = html.match(/"followers_count":(\d+)/);
-          if (m) return parseInt(m[1]);
-          // Meta description: "1,234 Followers"
-          m = html.match(/content="([\d,]+)\s+Followers/i);
-          if (m) return parseInt(m[1].replace(/,/g, ''));
-          return null;
+          // Attempt 1: unofficial JSON API (i.instagram.com subdomain)
+          const apiHtml = await proxyFetch(`https://i.instagram.com/api/v1/users/web_profile_info/?username=${h}`, 8000);
+          if (apiHtml) {
+            try {
+              const data = JSON.parse(apiHtml);
+              const count = data?.data?.user?.edge_followed_by?.count
+                         ?? data?.data?.user?.follower_count;
+              if (count > 0) return count;
+            } catch {}
+          }
+          // Attempt 2: page HTML — Instagram is SPA but sometimes embeds SSR data
+          const html = await proxyFetch(`https://www.instagram.com/${h}/`);
+          if (!html) return null;
+          return firstMatch(html,
+            /"edge_followed_by":\{"count":(\d+)\}/,
+            /"follower_count":(\d+)/,
+            /"followers_count":(\d+)/,
+            /content="([\d,]+)\s+Followers/i,
+            /"followers":"([\d,]+)"/i
+          );
         }
 
+        // ── X / Twitter ──────────────────────────────────────
         if (platform === 'twitter') {
-          const proxyUrl = CORS_PROXY + encodeURIComponent(`https://x.com/${h}`);
-          const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
-          if (!res.ok) return null;
-          const html = await res.text();
-          let m = html.match(/"normal_followers_count":(\d+)/);
-          if (m) return parseInt(m[1]);
-          m = html.match(/"followers_count":(\d+)/);
-          if (m) return parseInt(m[1]);
+          // x.com is fully client-rendered — try Nitter forks (server-side HTML)
+          // xcancel.com and nitter.space are known-live Nitter forks as of 2025
+          const nitterHosts = [
+            'https://xcancel.com',
+            'https://nitter.space',
+            'https://nitter.poast.org',
+            'https://nitter.privacydev.net',
+          ];
+          // Fire all in parallel, take first valid result
+          const htmlResults = await Promise.allSettled(
+            nitterHosts.map(host => proxyFetch(`${host}/${h}`, 7000))
+          );
+          for (const r of htmlResults) {
+            if (r.status !== 'fulfilled' || !r.value) continue;
+            const html = r.value;
+            if (html.includes('Instance is rate-limited') || html.includes('page not found')) continue;
+            // Nitter template: <span class="profile-stat-num">1,234</span> <span ...>Followers</span>
+            const n = firstMatch(html,
+              /class="profile-stat-num">([\d,]+)<\/span>\s*<span[^>]*>Followers/,
+              /profile-stat-num">([\d,.KMkmb]+)<\/span>[^<]*<\/a>[^<]*<\/li>[^<]*<li>[^<]*<a[^>]*>[^<]*<span[^>]*class="profile-stat-num">([\d,]+)<\/span>\s*<span[^>]*>Followers/,
+              /Followers[\s\S]{0,300}?class="profile-stat-num">([\d,]+)<\/span>/
+            );
+            if (n) return n;
+          }
           return null;
         }
 
+        // ── LinkedIn ─────────────────────────────────────────
         if (platform === 'linkedin') {
-          // LinkedIn blocks all scraping — skip
+          // LinkedIn blocks all unauthenticated scraping — cannot auto-fetch
           return null;
         }
+
       } catch (e) {
         return null;
       }
