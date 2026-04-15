@@ -45,7 +45,11 @@ window.DEFAULT_CONFIG = {
         },
         ease_of_working: {
           label: "Easy to Work With",
-          help: "Low-drama, responsive, collaborative. No diva behavior."
+          help: "Low-drama, collaborative. No diva behavior."
+        },
+        communication_responsiveness: {
+          label: "Communication Responsiveness",
+          help: "How quickly do they get back to you? 10 = same-day / immediately. 8–9 = reliable within 24 hrs. 6–7 = a few days. 4–5 = about a week. 2–3 = slow and inconsistent. 0–1 = hard to reach / rarely responds."
         },
         mission_alignment: {
           label: "Mission Alignment",
