@@ -42,4 +42,4 @@ window.SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmF
  * Change SW_PASSWORD to whatever you want your team to use.
  * All employees share this single password.
  */
-window.SW_PASSWORD = 'shiftwave2025';
+window.SW_PASSWORD = 'shiftwave';
