@@ -34,8 +34,8 @@
  * ───────────────────────────────────────────────────────────────────────────
  */
 
-window.SUPABASE_URL  = 'YOUR_SUPABASE_URL';   // e.g. https://xyzabc.supabase.co
-window.SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';
+window.SUPABASE_URL  = 'https://fhuhgfcqbeqyjaioaxtr.supabase.co';
+window.SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZodWhnZmNxYmVxeWphaW9heHRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NTI1MDAsImV4cCI6MjA5NjIyODUwMH0.EhZKTMidXXpwwUpyske_tatozIx7PvPZymKi-rny8j0';
 
 /**
  * Password gate config.
