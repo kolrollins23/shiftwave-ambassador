@@ -38,6 +38,7 @@ window.Storage = {
   setConfig(config) {
     config.updatedAt = new Date().toISOString();
     localStorage.setItem(this.CONFIG_KEY, JSON.stringify(config));
+    if (window.Sync) Sync.saveConfig(config);
   },
 
   getEvaluations() {
@@ -59,11 +60,13 @@ window.Storage = {
       evals.unshift(evaluation);
     }
     localStorage.setItem(this.EVALS_KEY, JSON.stringify(evals));
+    if (window.Sync) Sync.saveEval(evaluation);
   },
 
   deleteEvaluation(id) {
     const evals = this.getEvaluations().filter(e => e.id !== id);
     localStorage.setItem(this.EVALS_KEY, JSON.stringify(evals));
+    if (window.Sync) Sync.deleteEval(id);
   },
 
   getEvaluation(id) {
