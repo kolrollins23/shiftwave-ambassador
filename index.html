@@ -76,22 +76,29 @@
 
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/sync.js"></script>
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
   <script>
     // ── Mount Nav
     document.getElementById('nav-mount').innerHTML = UI.renderNav('index');
 
-    // ── Load Stats
-    const stats = AppStats.compute();
-    document.getElementById('stat-total').textContent = stats.total;
-    document.getElementById('stat-strong-yes').textContent = stats.strongYes;
-    document.getElementById('stat-avg').textContent = stats.total > 0 ? stats.avgScore : '—';
-    document.getElementById('stat-month').textContent = stats.thisMonth;
+    function renderStats() {
+      const stats = AppStats.compute();
+      document.getElementById('stat-total').textContent = stats.total;
+      document.getElementById('stat-strong-yes').textContent = stats.strongYes;
+      document.getElementById('stat-avg').textContent = stats.total > 0 ? stats.avgScore : '—';
+      document.getElementById('stat-month').textContent = stats.thisMonth;
+      const now = new Date();
+      document.getElementById('stat-month-label').textContent =
+        now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    }
 
-    const now = new Date();
-    document.getElementById('stat-month-label').textContent =
-      now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    // ── Load Stats
+    renderStats();
 
     // ── Recent Evaluations Table
     function renderRecentTable() {
@@ -159,6 +166,12 @@
     }
 
     renderRecentTable();
+
+    // Re-render once cloud sync completes with fresh data
+    window.addEventListener('cloud:ready', () => {
+      renderStats();
+      renderRecentTable();
+    });
   </script>
 </body>
 </html>
