@@ -883,7 +883,7 @@
 
     // ── Submit Evaluation
     // destination: 'dashboard' → index.html, 'results' → results.html?id=...
-    function submitEvaluation(destination = 'results') {
+    async function submitEvaluation(destination = 'results') {
       const dashBtn = document.getElementById('submit-dashboard-btn');
       const resBtn  = document.getElementById('submit-results-btn');
       if (dashBtn) { dashBtn.disabled = true; dashBtn.textContent = 'Saving…'; }
@@ -936,7 +936,19 @@
         }
       }
 
+      // Save locally first (instant), then wait for Supabase to confirm
+      // before redirecting — prevents the dashboard's cloud:ready from
+      // overwriting localStorage with stale data that doesn't include this eval.
       Storage.saveEvaluation(evaluation);
+
+      try {
+        if (window.Sync && Sync.isConfigured()) {
+          await Sync.saveEval(evaluation);
+        }
+      } catch (e) {
+        console.warn('[submit] Cloud save failed, proceeding with local data:', e);
+      }
+
       if (destination === 'dashboard') {
         window.location.href = 'index.html';
       } else {
