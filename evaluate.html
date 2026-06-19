@@ -260,9 +260,14 @@
 
       <div class="step-nav">
         <button class="btn btn--ghost" onclick="goToStep(3)">← Back</button>
-        <button class="btn btn--primary btn--lg" id="submit-btn" onclick="submitEvaluation()">
-          Score This Candidate
-        </button>
+        <div style="display:flex;gap:0.75rem;">
+          <button class="btn btn--secondary btn--lg" id="submit-results-btn" onclick="submitEvaluation('results')">
+            View Full Results
+          </button>
+          <button class="btn btn--primary btn--lg" id="submit-dashboard-btn" onclick="submitEvaluation('dashboard')">
+            ✓ Add to Dashboard
+          </button>
+        </div>
       </div>
     </div>
 
@@ -877,10 +882,12 @@
     }
 
     // ── Submit Evaluation
-    function submitEvaluation() {
-      const btn = document.getElementById('submit-btn');
-      btn.disabled = true;
-      btn.textContent = 'Saving...';
+    // destination: 'dashboard' → index.html, 'results' → results.html?id=...
+    function submitEvaluation(destination = 'results') {
+      const dashBtn = document.getElementById('submit-dashboard-btn');
+      const resBtn  = document.getElementById('submit-results-btn');
+      if (dashBtn) { dashBtn.disabled = true; dashBtn.textContent = 'Saving…'; }
+      if (resBtn)  { resBtn.disabled  = true; }
 
       const redFlags = {
         competitor_promotion: document.getElementById('flag-competitor').checked,
@@ -930,7 +937,11 @@
       }
 
       Storage.saveEvaluation(evaluation);
-      window.location.href = `results.html?id=${evaluation.id}`;
+      if (destination === 'dashboard') {
+        window.location.href = 'index.html';
+      } else {
+        window.location.href = `results.html?id=${evaluation.id}`;
+      }
     }
 
     // ── Init
