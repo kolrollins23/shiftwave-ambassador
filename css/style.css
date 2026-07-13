@@ -1651,6 +1651,7 @@ input[type="radio"].type-radio {
 .social-icon--x  { background: #111111; }
 .social-icon--yt { background: #ff0000; }
 .social-icon--tt { background: #010101; }
+.social-icon--fb { background: #1877F2; }
 
 .follower-total-bar {
   display: flex;
