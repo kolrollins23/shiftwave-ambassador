@@ -42,7 +42,7 @@ window.Sync = (() => {
         'position:fixed', 'bottom:14px', 'right:16px', 'z-index:9999',
         'font-size:0.72rem', 'font-weight:600', 'padding:4px 10px',
         'border-radius:999px', 'letter-spacing:0.04em',
-        'pointer-events:none', 'transition:opacity 0.3s'
+        'pointer-events:none', 'transition:opacity 0.4s'
       ].join(';');
       document.body.appendChild(badge);
     }
@@ -57,6 +57,17 @@ window.Sync = (() => {
       badge.style.color = '#86efac';
       badge.style.opacity = '1';
       setTimeout(() => { badge.style.opacity = '0'; }, 2000);
+    } else if (state === 'live') {
+      badge.textContent = '● Live';
+      badge.style.background = '#14532d';
+      badge.style.color = '#86efac';
+      badge.style.opacity = '0.55';
+    } else if (state === 'update') {
+      badge.textContent = '↺ New evaluation received';
+      badge.style.background = '#1e3a5f';
+      badge.style.color = '#93c5fd';
+      badge.style.opacity = '1';
+      setTimeout(() => { _showSyncBadge('live'); }, 2500);
     } else if (state === 'error') {
       badge.textContent = '⚠ Offline — local only';
       badge.style.background = '#431407';
@@ -68,8 +79,56 @@ window.Sync = (() => {
   }
 
   /**
+   * Handles a Supabase Realtime postgres_changes event.
+   * Updates localStorage and re-fires 'cloud:ready' so all open pages re-render.
+   */
+  function _handleRealtimeChange(payload) {
+    try {
+      const evals = JSON.parse(localStorage.getItem('sw_evaluations') || '[]');
+
+      if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+        const incoming = payload.new?.data;
+        if (!incoming) return;
+        const idx = evals.findIndex(e => e.id === incoming.id);
+        if (idx > -1) {
+          evals[idx] = incoming;
+        } else {
+          evals.unshift(incoming);
+        }
+        localStorage.setItem('sw_evaluations', JSON.stringify(evals));
+      } else if (payload.eventType === 'DELETE') {
+        const deletedId = payload.old?.id;
+        if (!deletedId) return;
+        const filtered = evals.filter(e => e.id !== deletedId);
+        localStorage.setItem('sw_evaluations', JSON.stringify(filtered));
+      }
+
+      _showSyncBadge('update');
+      window.dispatchEvent(new CustomEvent('cloud:ready', { detail: { source: 'realtime' } }));
+    } catch (e) {
+      console.warn('[Sync] Realtime change handler error:', e);
+    }
+  }
+
+  /** Subscribe to live Supabase Realtime updates for the evaluations table. */
+  function _subscribeRealtime(sb) {
+    try {
+      sb.channel('sw-evaluations-live')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'evaluations' }, _handleRealtimeChange)
+        .subscribe(status => {
+          if (status === 'SUBSCRIBED') {
+            _showSyncBadge('live');
+          }
+        });
+    } catch (e) {
+      console.warn('[Sync] Realtime subscription failed:', e);
+    }
+  }
+
+  /**
    * Call once per page load. Fetches all evaluations + config from Supabase,
    * writes to localStorage, then fires 'cloud:ready' so pages can re-render.
+   * Also opens a Realtime WebSocket so all tabs stay live without refreshing.
    */
   async function init() {
     if (!_isConfigured()) {
@@ -121,6 +180,9 @@ window.Sync = (() => {
     }
 
     window.dispatchEvent(new CustomEvent('cloud:ready', { detail: { source: 'cloud' } }));
+
+    // Open a persistent WebSocket so this tab receives changes made by other users.
+    _subscribeRealtime(sb);
   }
 
   /** Upsert a single evaluation to Supabase */
