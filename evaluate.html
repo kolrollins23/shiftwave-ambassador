@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Evaluation — Shiftwave Ambassador Tool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="nav-mount"></div>
+
+  <main class="page-wrapper page-wrapper--narrow">
+
+    <div class="page-header">
+      <div class="page-header__eyebrow">New Evaluation</div>
+      <h1 class="page-header__title">Score a Candidate</h1>
+      <p class="page-header__subtitle">Complete all four steps to generate a scoring recommendation</p>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-bar-wrapper mb-4">
+      <div class="progress-steps" id="progress-steps">
+        <div class="progress-step active" data-step="1">
+          <div class="progress-step__dot">1</div>
+          <div class="progress-step__label">Candidate Info</div>
+        </div>
+        <div class="progress-step" data-step="2">
+          <div class="progress-step__dot">2</div>
+          <div class="progress-step__label">Score Factors</div>
+        </div>
+        <div class="progress-step" data-step="3">
+          <div class="progress-step__dot">3</div>
+          <div class="progress-step__label">Red Flags</div>
+        </div>
+        <div class="progress-step" data-step="4">
+          <div class="progress-step__dot">4</div>
+          <div class="progress-step__label">Review & Submit</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 1: Candidate Info ── -->
+    <div id="step-1" class="step-pane">
+      <div class="card mb-4">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:1.5rem;">Candidate Information</h2>
+
+        <div class="form-group">
+          <label class="form-label" for="evaluator">Your Name (Evaluator)<span class="required">*</span></label>
+          <input class="form-input" type="text" id="evaluator" placeholder="e.g. Kol Rollins">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="candidate-name">Candidate Name<span class="required">*</span></label>
+          <input class="form-input" type="text" id="candidate-name" placeholder="Full name">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Ambassador Type<span class="required">*</span> <span style="font-size:0.8rem;font-weight:400;color:var(--text-sec);">— select one or more</span></label>
+          <div class="type-cards" id="type-cards">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <div class="form-cols">
+          <div class="form-group">
+            <label class="form-label" for="profession">Profession / Role</label>
+            <input class="form-input" type="text" id="profession" placeholder="e.g. Physical Therapist, Surgeon">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="location">Location / Market</label>
+            <input class="form-input" type="text" id="location" placeholder="e.g. NYC, Miami, LA, Austin">
+          </div>
+        </div>
+
+        <!-- Social Profiles + Follower Counts -->
+        <div class="form-group">
+          <label class="form-label">Social Profiles &amp; Follower Counts</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.875rem;flex-wrap:wrap;gap:0.5rem;">
+            <p style="font-size:0.8125rem;color:var(--text-sec);margin:0;">Enter handles and click <strong>Fetch</strong> — follower counts are looked up automatically where possible.</p>
+            <button type="button" class="btn btn--primary btn--sm" id="fetch-all-btn" onclick="fetchAllFollowers()">
+              <span id="fetch-all-icon">⬇</span> Fetch All
+            </button>
+          </div>
+
+          <div class="social-row">
+            <span class="social-icon social-icon--ig">IG</span>
+            <input class="form-input" type="text" id="instagram" placeholder="@handle" style="flex:1.5;" onblur="autoFetchOnBlur('instagram')">
+            <input class="form-input" type="number" id="followers-instagram" placeholder="Followers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
+            <span class="fetch-status" id="status-instagram"></span>
+            <button type="button" class="btn btn--ghost btn--sm" onclick="fetchPlatform('instagram')" title="Fetch followers">⬇</button>
+          </div>
+          <div class="social-row">
+            <span class="social-icon social-icon--li">LI</span>
+            <input class="form-input" type="text" id="linkedin" placeholder="linkedin.com/in/..." style="flex:1.5;" onblur="autoFetchOnBlur('linkedin')">
+            <input class="form-input" type="number" id="followers-linkedin" placeholder="Followers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
+            <span class="fetch-status" id="status-linkedin"></span>
+            <button type="button" class="btn btn--ghost btn--sm" onclick="fetchPlatform('linkedin')" title="Fetch followers">⬇</button>
+          </div>
+          <div class="social-row">
+            <span class="social-icon social-icon--x">X</span>
+            <input class="form-input" type="text" id="twitter" placeholder="@handle" style="flex:1.5;" onblur="autoFetchOnBlur('twitter')">
+            <input class="form-input" type="number" id="followers-twitter" placeholder="Followers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
+            <span class="fetch-status" id="status-twitter"></span>
+            <button type="button" class="btn btn--ghost btn--sm" onclick="fetchPlatform('twitter')" title="Fetch followers">⬇</button>
+          </div>
+          <div class="social-row">
+            <span class="social-icon social-icon--yt">YT</span>
+            <input class="form-input" type="text" id="youtube" placeholder="@channel or URL" style="flex:1.5;" onblur="autoFetchOnBlur('youtube')">
+            <input class="form-input" type="number" id="followers-youtube" placeholder="Subscribers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
+            <span class="fetch-status" id="status-youtube"></span>
+            <button type="button" class="btn btn--ghost btn--sm" onclick="fetchPlatform('youtube')" title="Fetch subscribers">⬇</button>
+          </div>
+          <div class="social-row">
+            <span class="social-icon social-icon--tt">TT</span>
+            <input class="form-input" type="text" id="tiktok" placeholder="@handle" style="flex:1.5;" onblur="autoFetchOnBlur('tiktok')">
+            <input class="form-input" type="number" id="followers-tiktok" placeholder="Followers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
+            <span class="fetch-status" id="status-tiktok"></span>
+            <button type="button" class="btn btn--ghost btn--sm" onclick="fetchPlatform('tiktok')" title="Fetch followers">⬇</button>
+          <div class="social-row">
+            <span class="social-icon social-icon--fb">FB</span>
+            <input class="form-input" type="text" id="facebook" placeholder="facebook.com/page..." style="flex:1.5;">
+            <input class="form-input" type="number" id="followers-facebook" placeholder="Followers" min="0" oninput="updateTotalFollowers()" style="flex:1;">
+            <span class="fetch-status" id="status-facebook"></span>
+            <span style="width:32px;display:inline-block;"></span>
+          </div>
+
+          <!-- Total + Auto Reach Score -->
+          <div class="follower-total-bar" id="follower-total-bar">
+            <div>
+              <span class="follower-total-label">Total Followers / Subscribers</span>
+              <span class="follower-total-value" id="follower-total-display">0</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span style="font-size:0.8125rem;color:var(--text-sec);">Auto Reach Score:</span>
+              <span class="reach-score-badge" id="reach-score-badge">0 / 10</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="initial-notes">Initial Notes</label>
+          <textarea class="form-textarea" id="initial-notes" rows="3" placeholder="How did they come up? First impressions? Context about why they're being evaluated..."></textarea>
+        </div>
+      </div>
+
+      <div class="step-nav">
+        <div></div>
+        <button class="btn btn--primary" onclick="goToStep(2)">Continue to Scoring →</button>
+      </div>
+    </div>
+
+    <!-- ── STEP 2: Score Factors ── -->
+    <div id="step-2" class="step-pane hidden">
+      <div id="scoring-categories">
+        <!-- Rendered by JS -->
+      </div>
+
+      <div class="step-nav">
+        <button class="btn btn--ghost" onclick="goToStep(1)">← Back</button>
+        <button class="btn btn--primary" onclick="goToStep(3)">Continue to Red Flags →</button>
+      </div>
+    </div>
+
+    <!-- ── STEP 3: Red Flags ── -->
+    <div id="step-3" class="step-pane hidden">
+      <div class="card mb-3">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:0.5rem;">Red Flags & Context</h2>
+        <p style="font-size:0.875rem;color:var(--text-sec);margin-bottom:1.5rem;">Check any that apply. Some will trigger hard stops that override the score.</p>
+
+        <div class="checkbox-item checkbox-item--danger" id="check-competitor">
+          <input type="checkbox" id="flag-competitor">
+          <label for="flag-competitor" class="checkbox-item__body" style="cursor:pointer">
+            <div class="checkbox-item__label">Actively promotes competitors</div>
+            <div class="checkbox-item__help">They are currently promoting a direct Shiftwave competitor. Triggers executive review flag.</div>
+          </label>
+        </div>
+
+        <div class="checkbox-item checkbox-item--danger" id="check-brand-risk">
+          <input type="checkbox" id="flag-brand-risk">
+          <label for="flag-brand-risk" class="checkbox-item__body" style="cursor:pointer">
+            <div class="checkbox-item__label">Reputation or brand safety concern</div>
+            <div class="checkbox-item__help">Known controversies, legal issues, or behaviors inconsistent with Shiftwave's brand. Triggers automatic No — Brand Risk.</div>
+          </label>
+        </div>
+
+        <div class="checkbox-item" id="check-oversaturated">
+          <input type="checkbox" id="flag-oversaturated">
+          <label for="flag-oversaturated" class="checkbox-item__body" style="cursor:pointer">
+            <div class="checkbox-item__label">Appears oversaturated / promotes everything</div>
+            <div class="checkbox-item__help">The "Greg" type — midlife male, promotes every product that hits their DMs. Exclusivity is important for our brand.</div>
+          </label>
+        </div>
+
+        <div class="checkbox-item" id="check-pricing">
+          <input type="checkbox" id="flag-pricing">
+          <label for="flag-pricing" class="checkbox-item__body" style="cursor:pointer">
+            <div class="checkbox-item__label">Financial expectations are unrealistic</div>
+            <div class="checkbox-item__help">Asking for $50k+ retainers or compensation structures that don't align with our model (7% commission, sell-10-get-1, mission-driven).</div>
+          </label>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <h3 style="font-size:1rem;font-weight:700;margin-bottom:1rem;">Suggested Compensation Structure</h3>
+        <div class="form-group">
+          <label class="form-label" for="comp-structure">What structure fits this person?</label>
+          <select class="form-select" id="comp-structure">
+            <option value="unknown">Unknown / TBD</option>
+            <option value="mission_driven">Mission-Driven (no ask)</option>
+            <option value="commission_7pct">7% Commission</option>
+            <option value="sell_10_get_1">Sell-10-Get-1-Free</option>
+            <option value="custom_retainer">Custom Retainer</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="evaluator-notes">Additional Notes</label>
+          <textarea class="form-textarea" id="evaluator-notes" rows="4"
+            placeholder="Anything else relevant — conversation details, specific strengths or concerns, next steps already discussed..."></textarea>
+        </div>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn btn--ghost" onclick="goToStep(2)">← Back</button>
+        <button class="btn btn--primary" onclick="goToStep(4)">Review & Submit →</button>
+      </div>
+    </div>
+
+    <!-- ── STEP 4: Review & Submit ── -->
+    <div id="step-4" class="step-pane hidden">
+      <div class="card mb-3">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:1.25rem;">Review Candidate</h2>
+        <div class="review-summary-grid" id="review-candidate-summary">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:1.25rem;">Score Preview</h2>
+        <div class="review-scores-list" id="review-scores-list">
+          <!-- Populated by JS -->
+        </div>
+
+        <div style="margin-top:1.5rem;padding:1.25rem;background:var(--elevated);border:1px solid var(--border);border-radius:var(--radius);text-align:center;">
+          <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-sec);margin-bottom:0.5rem;">Estimated Score</div>
+          <div id="review-estimated-score" style="font-size:3rem;font-weight:800;color:var(--accent);line-height:1;margin-bottom:0.5rem;">—</div>
+          <div id="review-rec-pill"></div>
+        </div>
+      </div>
+
+      <!-- Skipped Questions Summary -->
+      <div class="card mb-3" id="review-skipped-card" style="display:none;">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:0.25rem;">Skipped Questions</h2>
+        <p style="font-size:0.875rem;color:var(--text-sec);margin-bottom:0.75rem;">These sub-factors were excluded from the score. You can answer them later from the results page.</p>
+        <div class="skipped-questions-list" id="review-skipped-list"></div>
+      </div>
+
+      <div class="card mb-3" id="review-flags-card" style="display:none;">
+        <h2 style="font-size:1.125rem;font-weight:700;margin-bottom:1rem;color:var(--red);">Red Flags</h2>
+        <div id="review-flags-list"></div>
+      </div>
+
+      <div class="step-nav">
+        <button class="btn btn--ghost" onclick="goToStep(3)">← Back</button>
+        <div style="display:flex;gap:0.75rem;">
+          <button class="btn btn--secondary btn--lg" id="submit-results-btn" onclick="submitEvaluation('results')">
+            View Full Results
+          </button>
+          <button class="btn btn--primary btn--lg" id="submit-dashboard-btn" onclick="submitEvaluation('dashboard')">
+            ✓ Add to Dashboard
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/supabase-config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.getElementById('nav-mount').innerHTML = UI.renderNav('evaluate');
+
+    const config = Storage.getConfig();
+    let currentStep = 1;
+    let selectedTypes = [];   // now an array for multi-select
+    const scores = {};
+    const skippedFactors = {};  // { [sfKey]: true } for sub-factors excluded from scoring
+    let totalFollowers = 0;
+
+    // ── Follower count helpers
+    function updateTotalFollowers() {
+      const ids = ['instagram','linkedin','twitter','youtube','tiktok','facebook'];
+      totalFollowers = ids.reduce((sum, id) => {
+        return sum + (Number(document.getElementById(`followers-${id}`)?.value) || 0);
+      }, 0);
+
+      // Display formatted total
+      const display = document.getElementById('follower-total-display');
+      if (display) display.textContent = formatFollowers(totalFollowers);
+
+      // Auto reach score
+      const reachScore = ScoringEngine.getReachScore(totalFollowers);
+      const badge = document.getElementById('reach-score-badge');
+      if (badge) {
+        badge.textContent = `${reachScore} / 10`;
+        badge.style.background = reachScore >= 7 ? 'rgba(22,163,74,0.12)' :
+                                  reachScore >= 5 ? 'rgba(217,119,6,0.12)' :
+                                  'rgba(220,38,38,0.08)';
+        badge.style.color = reachScore >= 7 ? '#16a34a' :
+                             reachScore >= 5 ? '#d97706' : '#dc2626';
+      }
+
+      // Update live social_reach slider if visible
+      const slider = document.getElementById('slider-social_reach');
+      if (slider) {
+        slider.value = reachScore;
+        document.getElementById('num-social_reach').textContent = reachScore;
+        document.getElementById('lbl-social_reach').textContent = UI.scoreLabel(reachScore);
+      }
+    }
+
+    function formatFollowers(n) {
+      if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(0) + 'K';
+      return n.toString();
+    }
+
+    function openProfile(platform) {
+      const handles = {
+        instagram: `https://instagram.com/${(document.getElementById('instagram').value || '').replace('@','')}`,
+        linkedin:  document.getElementById('linkedin').value || 'https://linkedin.com',
+        twitter:   `https://x.com/${(document.getElementById('twitter').value || '').replace('@','')}`,
+        youtube:   `https://youtube.com/${document.getElementById('youtube').value || ''}`,
+        tiktok:    `https://tiktok.com/@${(document.getElementById('tiktok').value || '').replace('@','')}`,
+        facebook:  `https://facebook.com/${(document.getElementById('facebook').value || '').replace('facebook.com/','')}`
+      };
+      const url = handles[platform];
+      if (url) window.open(url, '_blank');
+    }
+
+    // ── Auto-fetch follower counts via CORS proxies
+    // Multiple proxies tried in order — first success wins
+    const CORS_PROXIES = [
+      url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+      url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    ];
+
+    async function proxyFetch(url, timeout = 9000) {
+      for (const makeProxy of CORS_PROXIES) {
+        try {
+          const res = await fetch(makeProxy(url), { signal: AbortSignal.timeout(timeout) });
+          if (res.ok) {
+            const text = await res.text();
+            if (text && text.length > 200) return text;
+          }
+        } catch (e) { /* try next proxy */ }
+      }
+      return null;
+    }
+
+    function parseCount(text) {
+      if (!text) return null;
+      const t = String(text).replace(/,/g, '').trim();
+      const m = t.match(/^([\d.]+)\s*([KMBkmb]?)/);
+      if (!m) return null;
+      const n = parseFloat(m[1]);
+      const mult = { k:1e3, m:1e6, b:1e9 }[m[2].toLowerCase()] || 1;
+      const result = Math.round(n * mult);
+      return result > 0 ? result : null;
+    }
+
+    function firstMatch(html, ...patterns) {
+      for (const p of patterns) {
+        const m = html.match(p);
+        if (m && m[1]) {
+          const raw = m[1].replace(/,/g, '').trim();
+          const n = parseCount(raw) || parseInt(raw);
+          if (n > 0) return n;
+        }
+      }
+      return null;
+    }
+
+    async function fetchFollowerCount(platform, handle) {
+      const h = handle.replace('@','').trim();
+      if (!h) return null;
+
+      try {
+
+        // ── YouTube ──────────────────────────────────────────
+        if (platform === 'youtube') {
+          const ytUrl = `https://www.youtube.com/@${h}`;
+          const html = await proxyFetch(ytUrl);
+          if (!html) return null;
+          // ytInitialData carries subscriber count in several formats
+          return firstMatch(html,
+            /"subscriberCountText":\{"accessibility":\{"accessibilityData":\{"label":"([\d.,KMB ]+)\s*subscriber/i,
+            /"subscriberCountText":\{"simpleText":"([^"]+)"\}/,
+            /"subscriberCountText":\{"runs":\[\{"text":"([^"]+)"\}/,
+            /,"([\d.]+[KMBkmb]?) subscribers"/i,
+            /"text":"([\d.]+[KMBkmb]+)","accessibility":\{"accessibilityData":\{"label":"[^"]*subscriber/i
+          );
+        }
+
+        // ── TikTok ───────────────────────────────────────────
+        if (platform === 'tiktok') {
+          const html = await proxyFetch(`https://www.tiktok.com/@${h}`);
+          if (!html) return null;
+          // TikTok embeds UNIVERSAL_DATA / SIGI_STATE JSON in <script> tags
+          return firstMatch(html,
+            /"followerCount":(\d+)/,
+            /"fans":(\d+)/,
+            /"stats":\{"followerCount":(\d+)/,
+            /"follower_count":(\d+)/,
+            /"digg_count":\d+,"follower_count":(\d+)/
+          );
+        }
+
+        // ── Instagram ────────────────────────────────────────
+        if (platform === 'instagram') {
+          // Attempt 1: unofficial JSON API (i.instagram.com subdomain)
+          const apiHtml = await proxyFetch(`https://i.instagram.com/api/v1/users/web_profile_info/?username=${h}`, 8000);
+          if (apiHtml) {
+            try {
+              const data = JSON.parse(apiHtml);
+              const count = data?.data?.user?.edge_followed_by?.count
+                         ?? data?.data?.user?.follower_count;
+              if (count > 0) return count;
+            } catch {}
+          }
+          // Attempt 2: page HTML — Instagram is SPA but sometimes embeds SSR data
+          const html = await proxyFetch(`https://www.instagram.com/${h}/`);
+          if (!html) return null;
+          return firstMatch(html,
+            /"edge_followed_by":\{"count":(\d+)\}/,
+            /"follower_count":(\d+)/,
+            /"followers_count":(\d+)/,
+            /content="([\d,]+)\s+Followers/i,
+            /"followers":"([\d,]+)"/i
+          );
+        }
+
+        // ── X / Twitter ──────────────────────────────────────
+        if (platform === 'twitter') {
+          // x.com is fully client-rendered — try Nitter forks (server-side HTML)
+          // xcancel.com and nitter.space are known-live Nitter forks as of 2025
+          const nitterHosts = [
+            'https://xcancel.com',
+            'https://nitter.space',
+            'https://nitter.poast.org',
+            'https://nitter.privacydev.net',
+          ];
+          // Fire all in parallel, take first valid result
+          const htmlResults = await Promise.allSettled(
+            nitterHosts.map(host => proxyFetch(`${host}/${h}`, 7000))
+          );
+          for (const r of htmlResults) {
+            if (r.status !== 'fulfilled' || !r.value) continue;
+            const html = r.value;
+            if (html.includes('Instance is rate-limited') || html.includes('page not found')) continue;
+            // Nitter template: <span class="profile-stat-num">1,234</span> <span ...>Followers</span>
+            const n = firstMatch(html,
+              /class="profile-stat-num">([\d,]+)<\/span>\s*<span[^>]*>Followers/,
+              /profile-stat-num">([\d,.KMkmb]+)<\/span>[^<]*<\/a>[^<]*<\/li>[^<]*<li>[^<]*<a[^>]*>[^<]*<span[^>]*class="profile-stat-num">([\d,]+)<\/span>\s*<span[^>]*>Followers/,
+              /Followers[\s\S]{0,300}?class="profile-stat-num">([\d,]+)<\/span>/
+            );
+            if (n) return n;
+          }
+          return null;
+        }
+
+        // ── LinkedIn ─────────────────────────────────────────
+        if (platform === 'linkedin') {
+          // LinkedIn blocks all unauthenticated scraping — cannot auto-fetch
+          return null;
+        }
+
+      } catch (e) {
+        return null;
+      }
+      return null;
+    }
+
+    function setFetchStatus(platform, state) {
+      // state: 'loading' | 'success' | 'manual' | ''
+      const el = document.getElementById(`status-${platform}`);
+      if (!el) return;
+      const map = {
+        loading: '<span title="Fetching…" style="color:#888;font-size:1rem;animation:spin 1s linear infinite;display:inline-block;">⟳</span>',
+        success: '<span title="Auto-fetched" style="color:#16a34a;font-size:1rem;">✓</span>',
+        manual:  '<span title="Could not auto-fetch — enter manually" style="color:#d97706;font-size:0.8rem;">manual</span>',
+        '':      ''
+      };
+      el.innerHTML = map[state] || '';
+    }
+
+    async function fetchPlatform(platform) {
+      const handle = document.getElementById(platform === 'twitter' ? 'twitter' : platform)?.value?.trim();
+      if (!handle) return;
+      setFetchStatus(platform, 'loading');
+      const count = await fetchFollowerCount(platform, handle);
+      if (count !== null && count > 0) {
+        document.getElementById(`followers-${platform}`).value = count;
+        updateTotalFollowers();
+        setFetchStatus(platform, 'success');
+      } else {
+        setFetchStatus(platform, 'manual');
+      }
+    }
+
+    async function autoFetchOnBlur(platform) {
+      const handle = document.getElementById(platform === 'twitter' ? 'twitter' : platform)?.value?.trim();
+      const existingCount = document.getElementById(`followers-${platform}`)?.value;
+      // Only auto-fetch if handle is filled and no count yet
+      if (handle && !existingCount) {
+        await fetchPlatform(platform);
+      }
+    }
+
+    async function fetchAllFollowers() {
+      const btn = document.getElementById('fetch-all-btn');
+      const icon = document.getElementById('fetch-all-icon');
+      btn.disabled = true;
+      icon.textContent = '⟳';
+
+      const platforms = ['instagram', 'linkedin', 'twitter', 'youtube', 'tiktok'];
+      await Promise.all(platforms.map(p => {
+        const handle = document.getElementById(p === 'twitter' ? 'twitter' : p)?.value?.trim();
+        if (handle) return fetchPlatform(p);
+      }));
+
+      btn.disabled = false;
+      icon.textContent = '⬇';
+    }
+
+    // ── Render Ambassador Type Cards (multi-select checkboxes)
+    function renderTypeCards() {
+      const container = document.getElementById('type-cards');
+      container.innerHTML = Object.entries(config.ambassadorTypes).map(([key, type]) => `
+        <div class="type-card${type.featured ? ' type-card--featured' : ''}" data-type="${key}" onclick="toggleType('${key}')">
+          <div class="type-card__check" id="check-${key}">✓</div>
+          <div class="type-card__icon">${type.icon}</div>
+          <div class="type-card__label">${type.label}</div>
+          <div class="type-card__desc">${type.description}</div>
+        </div>
+      `).join('');
+    }
+
+    function toggleType(key) {
+      const idx = selectedTypes.indexOf(key);
+      if (idx > -1) {
+        selectedTypes.splice(idx, 1);
+      } else {
+        selectedTypes.push(key);
+      }
+      // Update card visuals
+      document.querySelectorAll('.type-card').forEach(c => {
+        const t = c.dataset.type;
+        c.classList.toggle('selected', selectedTypes.includes(t));
+      });
+      if (currentStep === 2) renderScoringCategories();
+    }
+
+    // ── Render Scoring Categories
+    function renderScoringCategories() {
+      const container = document.getElementById('scoring-categories');
+      if (selectedTypes.length === 0) {
+        container.innerHTML = `<div class="callout callout--info"><span class="callout__icon">ℹ</span>Please go back and select at least one ambassador type first.</div>`;
+        return;
+      }
+
+      const blendedWeights = ScoringEngine.blendWeights(selectedTypes, config);
+      container.innerHTML = Object.entries(config.categories).map(([catKey, cat]) => {
+        const weight = Math.round((blendedWeights[catKey] || 0) * 10) / 10;
+        const isFeatured = catKey === 'reallife_access' && selectedTypes.includes('practitioner');
+
+        const subFactorHtml = Object.entries(cat.subFactors).map(([sfKey, sf]) => {
+          const isAuto = sf.autoScored;
+          const isSkipped = !isAuto && !!skippedFactors[sfKey];
+          const currentVal = isAuto
+            ? ScoringEngine.getReachScore(totalFollowers)
+            : (scores[sfKey] !== undefined ? scores[sfKey] : 5);
+          return `
+            <div class="slider-group${isAuto ? ' slider-group--auto' : ''}${isSkipped ? ' slider-group--skipped' : ''}" id="sg-${sfKey}">
+              <div class="slider-header">
+                <span class="slider-label">${sf.label}${isAuto ? ' <span class="auto-badge">AUTO</span>' : ''}</span>
+                <div class="slider-value-display">
+                  ${!isAuto ? `<button class="skip-btn${isSkipped ? ' skip-btn--active' : ''}" id="skipbtn-${sfKey}"
+                    onclick="toggleSkip('${sfKey}', '${catKey}')"
+                    title="${isSkipped ? 'Click to include this question' : 'Click to skip this question'}">
+                    ${isSkipped ? '+ Include' : 'Skip'}
+                  </button>` : ''}
+                  <input type="number" class="slider-number-input" id="num-${sfKey}"
+                    value="${isSkipped ? '' : currentVal}" min="0" max="10" step="1"
+                    placeholder="${isSkipped ? '—' : ''}"
+                    ${isAuto || isSkipped ? 'disabled' : `oninput="updateFromInput('${sfKey}', '${catKey}', this)"`}>
+                  <span class="slider-label-text" id="lbl-${sfKey}">${isSkipped ? 'Skipped' : UI.scoreLabel(currentVal)}</span>
+                </div>
+              </div>
+              <div class="slider-help">${sf.help}</div>
+              <input type="range" min="0" max="10" value="${currentVal}"
+                id="slider-${sfKey}"
+                ${isAuto || isSkipped ? 'disabled style="opacity:0.5;cursor:not-allowed;"' : `oninput="updateSlider('${sfKey}', '${catKey}', this.value)"`}>
+              ${isAuto ? `<div style="font-size:0.75rem;color:var(--text-sec);margin-top:0.25rem;">Based on ${formatFollowers(totalFollowers)} total followers across all platforms. Enter counts in Step 1 to update.</div>` : ''}
+            </div>
+          `;
+        }).join('');
+
+        // Category average: only count non-skipped sub-factors
+        const sfKeys = Object.keys(cat.subFactors);
+        const activeSfKeys = sfKeys.filter(k => cat.subFactors[k]?.autoScored || !skippedFactors[k]);
+        const avg = activeSfKeys.length > 0
+          ? activeSfKeys.reduce((s, k) => {
+              if (cat.subFactors[k]?.autoScored) return s + ScoringEngine.getReachScore(totalFollowers);
+              return s + (scores[k] !== undefined ? scores[k] : 5);
+            }, 0) / activeSfKeys.length
+          : null;
+
+        return `
+          <div class="category-section${isFeatured ? ' category-section--featured' : ''}" id="cat-section-${catKey}">
+            <div class="category-header">
+              <div class="category-header__left">
+                <div class="category-header__label">
+                  ${cat.label}
+                  ${isFeatured ? '<span class="category-featured-tag">Top Priority</span>' : ''}
+                  <span style="font-size:0.75rem;color:var(--text-muted);font-weight:400;margin-left:4px;">Weight: ${weight}%</span>
+                </div>
+                <div class="category-header__desc">${cat.description}</div>
+                <div class="category-header__note">${cat.founderNote}</div>
+              </div>
+              <div class="category-score-preview">
+                <div class="category-score-preview__label">Avg</div>
+                <div class="category-score-preview__value" id="cat-avg-${catKey}">${avg !== null ? avg.toFixed(1) : '—'}</div>
+                <div class="category-score-preview__sub">${avg !== null ? '/ 10' : 'skipped'}</div>
+              </div>
+            </div>
+            <div class="category-body">
+              ${subFactorHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateCategoryAvg(catKey) {
+      const cat = config.categories[catKey];
+      const sfKeys = Object.keys(cat.subFactors);
+      const activeSfs = sfKeys.filter(k => cat.subFactors[k]?.autoScored || !skippedFactors[k]);
+      const avgEl = document.getElementById(`cat-avg-${catKey}`);
+      const subEl = avgEl?.nextElementSibling;
+      if (!avgEl) return;
+      if (activeSfs.length === 0) {
+        avgEl.textContent = '—';
+        if (subEl) subEl.textContent = 'skipped';
+      } else {
+        const avg = activeSfs.reduce((s, k) => {
+          if (cat.subFactors[k]?.autoScored) return s + ScoringEngine.getReachScore(totalFollowers);
+          return s + (scores[k] !== undefined ? scores[k] : 5);
+        }, 0) / activeSfs.length;
+        avgEl.textContent = avg.toFixed(1);
+        if (subEl) subEl.textContent = '/ 10';
+      }
+    }
+
+    function updateSlider(sfKey, catKey, value) {
+      scores[sfKey] = Number(value);
+      const numInput = document.getElementById(`num-${sfKey}`);
+      if (numInput) numInput.value = value;
+      document.getElementById(`lbl-${sfKey}`).textContent = UI.scoreLabel(value);
+      updateCategoryAvg(catKey);
+    }
+
+    function updateFromInput(sfKey, catKey, inputEl) {
+      let val = parseInt(inputEl.value, 10);
+      if (isNaN(val)) return;
+      val = Math.max(0, Math.min(10, val));   // clamp to 0–10
+      inputEl.value = val;
+      const slider = document.getElementById(`slider-${sfKey}`);
+      if (slider) slider.value = val;
+      updateSlider(sfKey, catKey, val);
+    }
+
+    function toggleSkip(sfKey, catKey) {
+      const wasSkipped = !!skippedFactors[sfKey];
+      if (wasSkipped) {
+        delete skippedFactors[sfKey];
+      } else {
+        skippedFactors[sfKey] = true;
+      }
+      const isNowSkipped = !wasSkipped;
+
+      // Toggle row appearance
+      const sg = document.getElementById(`sg-${sfKey}`);
+      if (sg) sg.classList.toggle('slider-group--skipped', isNowSkipped);
+
+      // Toggle skip button label/style
+      const btn = document.getElementById(`skipbtn-${sfKey}`);
+      if (btn) {
+        btn.textContent = isNowSkipped ? '+ Include' : 'Skip';
+        btn.classList.toggle('skip-btn--active', isNowSkipped);
+        btn.title = isNowSkipped ? 'Click to include this question' : 'Click to skip this question';
+      }
+
+      // Toggle slider and number input
+      const slider = document.getElementById(`slider-${sfKey}`);
+      const numInput = document.getElementById(`num-${sfKey}`);
+      const lbl = document.getElementById(`lbl-${sfKey}`);
+      if (isNowSkipped) {
+        if (slider) { slider.disabled = true; slider.style.opacity = '0.5'; }
+        if (numInput) { numInput.disabled = true; numInput.value = ''; numInput.placeholder = '—'; }
+        if (lbl) lbl.textContent = 'Skipped';
+      } else {
+        if (slider) { slider.disabled = false; slider.style.opacity = ''; }
+        if (numInput) {
+          numInput.disabled = false;
+          numInput.placeholder = '';
+          const val = scores[sfKey] !== undefined ? scores[sfKey] : 5;
+          numInput.value = val;
+          if (slider) slider.value = val;
+        }
+        if (lbl) lbl.textContent = UI.scoreLabel(scores[sfKey] !== undefined ? scores[sfKey] : 5);
+      }
+
+      updateCategoryAvg(catKey);
+    }
+
+    // ── Step Navigation
+    function goToStep(step) {
+      // Validate step 1
+      if (step > 1) {
+        const evaluator = document.getElementById('evaluator').value.trim();
+        const candName = document.getElementById('candidate-name').value.trim();
+        if (!candName) {
+          alert('Please enter the candidate name.');
+          return;
+        }
+        if (selectedTypes.length === 0) {
+          alert('Please select at least one ambassador type.');
+          return;
+        }
+      }
+
+      currentStep = step;
+
+      // Hide all steps
+      document.querySelectorAll('.step-pane').forEach(p => p.classList.add('hidden'));
+      document.getElementById(`step-${step}`).classList.remove('hidden');
+
+      // Update progress
+      document.querySelectorAll('.progress-step').forEach(el => {
+        const s = parseInt(el.dataset.step);
+        el.classList.remove('active', 'completed');
+        if (s < step) el.classList.add('completed');
+        if (s === step) el.classList.add('active');
+      });
+
+      if (step === 2) {
+        renderScoringCategories();
+      }
+
+      if (step === 4) {
+        renderReview();
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ── Render Review Step
+    function renderReview() {
+      const candName = document.getElementById('candidate-name').value.trim();
+      const evaluator = document.getElementById('evaluator').value.trim();
+      const profession = document.getElementById('profession').value.trim();
+      const location = document.getElementById('location').value.trim();
+      const instagram = document.getElementById('instagram').value.trim();
+      const typeLabels = selectedTypes.map(t => config.ambassadorTypes[t]?.label || t).join(', ');
+
+      // Candidate summary
+      document.getElementById('review-candidate-summary').innerHTML = `
+        <div class="review-summary-item">
+          <div class="review-summary-item__label">Name</div>
+          <div class="review-summary-item__value">${candName || '—'}</div>
+        </div>
+        <div class="review-summary-item">
+          <div class="review-summary-item__label">Type(s)</div>
+          <div class="review-summary-item__value">${selectedTypes.map(t => `<span class="type-badge">${config.ambassadorTypes[t]?.label || t}</span>`).join(' ')}</div>
+        </div>
+        <div class="review-summary-item">
+          <div class="review-summary-item__label">Profession</div>
+          <div class="review-summary-item__value">${profession || '—'}</div>
+        </div>
+        <div class="review-summary-item">
+          <div class="review-summary-item__label">Location</div>
+          <div class="review-summary-item__value">${location || '—'}</div>
+        </div>
+        <div class="review-summary-item">
+          <div class="review-summary-item__label">Total Followers</div>
+          <div class="review-summary-item__value">${formatFollowers(totalFollowers)}</div>
+        </div>
+        <div class="review-summary-item">
+          <div class="review-summary-item__label">Evaluator</div>
+          <div class="review-summary-item__value">${evaluator || '—'}</div>
+        </div>
+      `;
+
+      // Scores list
+      const blendedWeights = ScoringEngine.blendWeights(selectedTypes, config);
+      document.getElementById('review-scores-list').innerHTML = Object.entries(config.categories).map(([catKey, cat]) => {
+        const sfKeys = Object.keys(cat.subFactors);
+        const activeSfs = sfKeys.filter(k => cat.subFactors[k]?.autoScored || !skippedFactors[k]);
+        const skippedCount = sfKeys.filter(k => !cat.subFactors[k]?.autoScored && !!skippedFactors[k]).length;
+        const avg = activeSfs.length > 0
+          ? activeSfs.reduce((s, k) => {
+              if (cat.subFactors[k]?.autoScored) return s + ScoringEngine.getReachScore(totalFollowers);
+              return s + (scores[k] !== undefined ? scores[k] : 5);
+            }, 0) / activeSfs.length
+          : null;
+        const weight = Math.round((blendedWeights[catKey] || 0) * 10) / 10;
+        return `
+          <div class="review-score-row">
+            <span class="review-score-label">${cat.label} <span style="color:var(--text-muted);font-weight:400;font-size:0.8em;">(${weight}%)</span>${skippedCount > 0 ? `<span class="skipped-badge">${skippedCount} skipped</span>` : ''}</span>
+            <span class="review-score-value">${avg !== null ? avg.toFixed(1) + ' / 10' : '<span style="color:#d97706;">Skipped</span>'}</span>
+          </div>
+        `;
+      }).join('');
+
+      // Skipped questions list
+      const allSkipped = [];
+      Object.entries(config.categories).forEach(([catKey, cat]) => {
+        Object.entries(cat.subFactors).forEach(([sfKey, sf]) => {
+          if (skippedFactors[sfKey] && !sf.autoScored) {
+            allSkipped.push({ catLabel: cat.label, sfLabel: sf.label });
+          }
+        });
+      });
+      const skippedCard = document.getElementById('review-skipped-card');
+      if (allSkipped.length > 0) {
+        skippedCard.style.display = '';
+        document.getElementById('review-skipped-list').innerHTML = allSkipped.map(item => `
+          <div class="skipped-question-item">
+            <span class="skipped-question-item__cat">${item.catLabel}</span>
+            <span style="color:var(--text-muted)">›</span>
+            <span class="skipped-question-item__label">${item.sfLabel}</span>
+          </div>
+        `).join('');
+      } else {
+        skippedCard.style.display = 'none';
+      }
+
+      // Live score calculation
+      const redFlags = {
+        competitor_promotion: document.getElementById('flag-competitor').checked,
+        brand_risk: document.getElementById('flag-brand-risk').checked,
+        oversaturated: document.getElementById('flag-oversaturated').checked,
+        pricing_mismatch: document.getElementById('flag-pricing').checked
+      };
+
+      const result = ScoringEngine.calculate(scores, selectedTypes, config, redFlags, totalFollowers, skippedFactors);
+
+      document.getElementById('review-estimated-score').textContent = Math.round(result.totalScore)
+        + (result.isPartial ? ' *' : '');
+      document.getElementById('review-rec-pill').innerHTML = UI.recPill(result.recommendation);
+
+      // Flags
+      const flagNames = {
+        competitor_promotion: 'Actively promotes competitors',
+        brand_risk: 'Brand/reputation concern',
+        oversaturated: 'Oversaturated / promotes everything',
+        pricing_mismatch: 'Financial expectations mismatch'
+      };
+      const activeFlags = Object.entries(redFlags).filter(([,v]) => v);
+      if (activeFlags.length > 0) {
+        document.getElementById('review-flags-card').style.display = '';
+        document.getElementById('review-flags-list').innerHTML = activeFlags.map(([k]) => `
+          <div style="padding:8px 12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius);margin-bottom:0.5rem;font-size:0.875rem;color:var(--red);">
+            ⚑ ${flagNames[k]}
+          </div>
+        `).join('');
+      } else {
+        document.getElementById('review-flags-card').style.display = 'none';
+      }
+    }
+
+    // ── Submit Evaluation
+    // destination: 'dashboard' → index.html, 'results' → results.html?id=...
+    async function submitEvaluation(destination = 'results') {
+      const dashBtn = document.getElementById('submit-dashboard-btn');
+      const resBtn  = document.getElementById('submit-results-btn');
+      if (dashBtn) { dashBtn.disabled = true; dashBtn.textContent = 'Saving…'; }
+      if (resBtn)  { resBtn.disabled  = true; }
+
+      const redFlags = {
+        competitor_promotion: document.getElementById('flag-competitor').checked,
+        brand_risk: document.getElementById('flag-brand-risk').checked,
+        oversaturated: document.getElementById('flag-oversaturated').checked,
+        pricing_mismatch: document.getElementById('flag-pricing').checked
+      };
+
+      const result = ScoringEngine.calculate(scores, selectedTypes, config, redFlags, totalFollowers, skippedFactors);
+
+      const candidate = {
+        name: document.getElementById('candidate-name').value.trim(),
+        type: selectedTypes,
+        typeLabel: selectedTypes.map(t => config.ambassadorTypes[t]?.label || t).join(' + '),
+        profession: document.getElementById('profession').value.trim(),
+        location: document.getElementById('location').value.trim(),
+        instagram: document.getElementById('instagram').value.trim(),
+        linkedin: document.getElementById('linkedin').value.trim(),
+        twitter: document.getElementById('twitter').value.trim(),
+        youtube: document.getElementById('youtube').value.trim(),
+        tiktok: document.getElementById('tiktok').value.trim(),
+        facebook: document.getElementById('facebook').value.trim(),
+        totalFollowers,
+        notes: document.getElementById('initial-notes').value.trim()
+      };
+
+      const evaluation = {
+        id: Date.now().toString(),
+        createdAt: new Date().toISOString(),
+        evaluator: document.getElementById('evaluator').value.trim(),
+        candidate,
+        scores: Object.assign({}, scores),
+        skippedFactors: Object.assign({}, skippedFactors),
+        redFlags,
+        compensationStructure: document.getElementById('comp-structure').value,
+        evaluatorNotes: document.getElementById('evaluator-notes').value.trim(),
+        result,
+        override: null
+      };
+
+      // Fill in defaults (5) for any non-skipped sub-factors the user never touched
+      for (const [catKey, cat] of Object.entries(config.categories)) {
+        for (const sfKey of Object.keys(cat.subFactors)) {
+          if (!evaluation.skippedFactors[sfKey] && evaluation.scores[sfKey] === undefined) {
+            evaluation.scores[sfKey] = 5;
+          }
+        }
+      }
+
+      // Save locally first (instant), then wait for Supabase to confirm
+      // before redirecting — prevents the dashboard's cloud:ready from
+      // overwriting localStorage with stale data that doesn't include this eval.
+      Storage.saveEvaluation(evaluation);
+
+      try {
+        if (window.Sync && Sync.isConfigured()) {
+          await Sync.saveEval(evaluation);
+        }
+      } catch (e) {
+        console.warn('[submit] Cloud save failed, proceeding with local data:', e);
+      }
+
+      if (destination === 'dashboard') {
+        window.location.href = 'index.html';
+      } else {
+        window.location.href = `results.html?id=${evaluation.id}`;
+      }
+    }
+
+    // ── Init
+    renderTypeCards();
+  </script>
+</body>
+</html>
